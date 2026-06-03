@@ -145,7 +145,7 @@ function App() {
         >
           {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
         </button>
-        <h1><ShoppingCart size={36} style={{ verticalAlign: 'middle', marginRight: '10px' }} /> Market Log</h1>
+        <h1><ShoppingCart size={36} style={{ verticalAlign: 'middle', marginRight: '10px' }} /> Track iT</h1>
 
         <div className="nav-tabs">
           <button
