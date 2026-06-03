@@ -12,6 +12,7 @@ function App() {
   const [stats, setStats] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
+  const [tappedQtyIndex, setTappedQtyIndex] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'add', 'history', 'items'
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem('theme');
@@ -230,7 +231,7 @@ function App() {
       {selectedReceipt && (
         <div 
           className="modal-overlay" 
-          onClick={() => setSelectedReceipt(null)}
+          onClick={() => { setSelectedReceipt(null); setTappedQtyIndex(null); }}
         >
           <div 
             className="print-receipt"
@@ -255,7 +256,7 @@ function App() {
                 </button>
                 <button
                   className="modal-header-btn"
-                  onClick={() => setSelectedReceipt(null)}
+                  onClick={() => { setSelectedReceipt(null); setTappedQtyIndex(null); }}
                 >
                   <X size={20} />
                 </button>
@@ -286,12 +287,21 @@ function App() {
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{item.category}</div>
                     </td>
                     <td 
-                      style={{ cursor: item.size_value && item.size_unit ? 'help' : 'default' }}
-                      title={item.size_value && item.size_unit ? `pkt = ${item.size_value}${item.size_unit}` : undefined}
+                      style={{ cursor: item.size_value && item.size_unit ? 'pointer' : 'default' }}
+                      onClick={() => {
+                        if (item.size_value && item.size_unit) {
+                          setTappedQtyIndex(prev => prev === i ? null : i);
+                        }
+                      }}
                     >
                       {item.size_value && item.size_unit
                         ? `${Math.round(item.quantity)} pkt`
                         : `${parseFloat(item.quantity).toFixed(1)} ${item.default_unit || 'unit'}`}
+                      {tappedQtyIndex === i && item.size_value && item.size_unit && (
+                        <div style={{ fontSize: '0.75rem', color: 'var(--secondary)', marginTop: '2px' }}>
+                          pkt = {item.size_value}{item.size_unit}
+                        </div>
+                      )}
                     </td>
                     <td>₹{parseFloat(item.price_per_unit || 0).toFixed(1)}</td>
                     <td style={{ fontWeight: 'bold' }}>₹{parseFloat(item.total_amount || 0).toFixed(1)}</td>
