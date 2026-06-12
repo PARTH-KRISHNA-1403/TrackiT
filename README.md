@@ -15,7 +15,8 @@ Track iT is a modern, mobile-friendly web app that helps you log grocery purchas
 | **Manage Items** | Add, edit, and delete item variants with size/weight metadata, organized by category. |
 | **Search** | Search items and receipts by name, source, or receipt ID. Results grouped by store. |
 | **Price History** | Interactive line chart showing how an item's price changes over time (powered by Recharts). |
-| **Receipt Modal** | Tap any receipt to view a detailed, printable bill breakdown. |
+| **Receipt Modal** | Tap any receipt to view a detailed, printable bill breakdown. Features toggleable glassmorphic detail boxes for items with custom descriptions. |
+| **History Redirection** | Click any entry in the recent purchase history (Item History tab) to instantly view the corresponding receipt. |
 | **Dark / Light Mode** | Toggle between themes; preference is saved in local storage. |
 | **PWA Support** | Installable on mobile devices with offline-ready service worker via `vite-plugin-pwa`. |
 
@@ -106,7 +107,6 @@ The app will be available at **http://localhost:5173** (default Vite port).
 
 ```bash
 npm run build
-npm run preview   # Preview the production build locally
 ```
 
 ---
@@ -138,6 +138,7 @@ The app expects two tables in your Supabase project:
 | `total_amount` | `float` | Total cost for this line item |
 | `purchase_date` | `timestamptz` | Date of purchase |
 | `receipt_id` | `text` | Groups items into a single receipt |
+| `description` | `text` | Custom one-time item description (e.g., brand, color) — *nullable* |
 
 ---
 
