@@ -13,6 +13,7 @@ function App() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
   const [tappedQtyIndex, setTappedQtyIndex] = useState(null);
+  const [tappedDescIndex, setTappedDescIndex] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'add', 'history', 'items'
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem('theme');
@@ -37,9 +38,9 @@ function App() {
     purchaseDate: new Date().toISOString().split('T')[0],
     amountTaken: '',
     items: [
-      { id: Date.now(), itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '' },
-      { id: Date.now() + 1, itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '' },
-      { id: Date.now() + 2, itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '' }
+      { id: Date.now(), itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '', hasDescription: false, description: '' },
+      { id: Date.now() + 1, itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '', hasDescription: false, description: '' },
+      { id: Date.now() + 2, itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '', hasDescription: false, description: '' }
     ]
   });
 
@@ -111,7 +112,9 @@ function App() {
       sizeUnit: item.size_unit || '',
       quantity: item.quantity,
       pricePerUnit: parseFloat(item.price_per_unit).toFixed(1),
-      totalAmount: parseFloat(item.total_amount).toFixed(1)
+      totalAmount: parseFloat(item.total_amount).toFixed(1),
+      hasDescription: !!item.description,
+      description: item.description || ''
     }));
 
     setDraftPurchase({
@@ -124,6 +127,7 @@ function App() {
     setEditingReceiptId(receipt.receiptId);
     setActiveTab('add');
     setSelectedReceipt(null);
+    setTappedDescIndex(null);
   };
 
   const handlePurchaseAdded = () => {
@@ -134,6 +138,26 @@ function App() {
   const handleItemClick = (purchase) => {
     setSelectedItem(purchase);
     setActiveTab('history');
+  };
+
+  const handleOpenReceiptFromHistory = (historyItem) => {
+    const receiptItems = purchases.filter(p => {
+      if (historyItem.receiptId && p.receipt_id) {
+        return p.receipt_id === historyItem.receiptId;
+      }
+      return p.purchase_date === historyItem.date && p.source === historyItem.source;
+    });
+
+    if (receiptItems.length > 0) {
+      const receiptObj = {
+        receiptId: receiptItems[0].receipt_id,
+        date: receiptItems[0].purchase_date,
+        source: receiptItems[0].source,
+        items: receiptItems,
+        total: receiptItems.reduce((sum, p) => sum + parseFloat(p.total_amount || 0), 0)
+      };
+      setSelectedReceipt(receiptObj);
+    }
   };
 
   return (
@@ -219,7 +243,7 @@ function App() {
               ← Back to Dashboard
             </button>
             {selectedItem ? (
-              <ItemHistory item={selectedItem} />
+              <ItemHistory item={selectedItem} onReceiptClick={handleOpenReceiptFromHistory} />
             ) : (
               <p>Please select an item from the dashboard to view its history.</p>
             )}
@@ -231,7 +255,7 @@ function App() {
       {selectedReceipt && (
         <div 
           className="modal-overlay" 
-          onClick={() => { setSelectedReceipt(null); setTappedQtyIndex(null); }}
+          onClick={() => { setSelectedReceipt(null); setTappedQtyIndex(null); setTappedDescIndex(null); }}
         >
           <div 
             className="print-receipt"
@@ -256,7 +280,7 @@ function App() {
                 </button>
                 <button
                   className="modal-header-btn"
-                  onClick={() => { setSelectedReceipt(null); setTappedQtyIndex(null); }}
+                  onClick={() => { setSelectedReceipt(null); setTappedQtyIndex(null); setTappedDescIndex(null); }}
                 >
                   <X size={20} />
                 </button>
@@ -283,8 +307,52 @@ function App() {
                 {selectedReceipt.items.map((item, i) => (
                   <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'center' }}>
                     <td>
-                      <div style={{ fontWeight: 'bold' }}>{item.item_name}</div>
+                      <div 
+                        style={{ 
+                          fontWeight: 'bold', 
+                          cursor: item.description ? 'pointer' : 'default',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          justifyContent: 'center'
+                        }}
+                        onClick={() => {
+                          if (item.description) {
+                            setTappedDescIndex(prev => prev === i ? null : i);
+                          }
+                        }}
+                      >
+                        {item.item_name}
+                        {item.description && (
+                          <span 
+                            style={{ 
+                              display: 'inline-flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center',
+                              background: 'rgba(16, 185, 129, 0.2)', 
+                              color: 'var(--primary)', 
+                              borderRadius: '50%', 
+                              width: '16px', 
+                              height: '16px', 
+                              fontSize: '0.65rem',
+                              fontWeight: 'bold'
+                            }} 
+                            title="Click to view description"
+                          >
+                            i
+                          </span>
+                        )}
+                      </div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{item.category}</div>
+                      
+                      {tappedDescIndex === i && item.description && (
+                        <div className="description-box animate-fade-in">
+                          <strong style={{ color: 'var(--primary)', fontSize: '0.75rem', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>
+                            Description:
+                          </strong>
+                          {item.description}
+                        </div>
+                      )}
                     </td>
                     <td 
                       style={{ cursor: item.size_value && item.size_unit ? 'pointer' : 'default' }}
@@ -311,7 +379,7 @@ function App() {
               <tfoot>
                 <tr>
                   <td colSpan="3" style={{ fontWeight: 'bold', fontSize: '1.2rem', textAlign: 'center' }}>Total Amount</td>
-                  <td style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '1.5rem', color: 'var(--secondary)' }}>
+                  <td style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '1.5rem', color: 'var(--secondary)', whiteSpace: 'nowrap' }}>
                     ₹{selectedReceipt.total.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                   </td>
                 </tr>

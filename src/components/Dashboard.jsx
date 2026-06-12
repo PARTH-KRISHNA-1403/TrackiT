@@ -110,16 +110,19 @@ export default function Dashboard({ stats, purchases, onPurchaseClick, onEditRec
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontWeight: 'bold', color: 'var(--secondary)' }}>₹{parseFloat(p.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-                    <span 
-                      style={{ cursor: p.size_value && p.size_unit ? 'help' : 'default' }}
-                      title={p.size_value && p.size_unit ? `pkt = ${p.size_value}${p.size_unit}` : undefined}
-                    >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+                    <span style={{ color: 'var(--secondary)', fontWeight: 'bold', fontSize: '1.1rem' }}>
                       {p.size_value && p.size_unit
                         ? `${Math.round(p.quantity)} pkt`
-                        : `${parseFloat(p.quantity).toFixed(1)} ${p.default_unit || 'unit'}`}
-                    </span> @ ₹{parseFloat(p.price_per_unit || 0).toFixed(1)}
+                        : `${parseFloat(p.quantity).toFixed(1)} ${p.default_unit || 'unit'}`
+                      }
+                    </span>
+                    <span style={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'var(--text-main)' }}>
+                      ₹{parseFloat(p.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                    </span>
+                  </div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '4px' }}>
+                    ₹{parseFloat(p.price_per_unit || 0).toFixed(1)} / {p.size_value && p.size_unit ? 'pkt' : (p.default_unit || 'unit')}
                   </div>
                 </div>
               </div>

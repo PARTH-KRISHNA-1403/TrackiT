@@ -940,3 +940,113 @@ body.light-mode .serial-number {
     padding: 12px 6px;
   }
 }
+
+/* Item Name Cell Content Wrapper */
+.item-name-cell-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.item-name-cell-content input {
+  width: 100% !important;
+}
+
+@media (max-width: 768px) {
+  .responsive-table td:nth-of-type(2) {
+    padding-left: 12px !important;
+    display: block !important;
+    min-height: auto !important;
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
+  }
+
+  .responsive-table td:nth-of-type(2)::before {
+    display: none !important;
+  }
+
+  .responsive-table td .item-name-cell-content {
+    display: grid !important;
+    grid-template-columns: 35% 65% !important;
+    row-gap: 8px !important;
+    column-gap: 0 !important;
+    width: 100% !important;
+    align-items: center !important;
+  }
+
+  .responsive-table td .item-name-cell-content::before {
+    content: "Item" !important;
+    font-weight: 600 !important;
+    color: var(--text-muted) !important;
+    font-size: 0.8rem !important;
+    text-align: left !important;
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+  }
+
+  .responsive-table td .item-name-cell-content .item-name-input {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    width: 100% !important;
+    text-align: left !important;
+  }
+
+  .responsive-table td .item-name-cell-content .desc-checkbox-container {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    justify-content: flex-start !important;
+    margin: 0 !important;
+  }
+
+  .responsive-table td .item-name-cell-content .item-desc-input {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+    width: 100% !important;
+    text-align: left !important;
+    margin: 0 !important;
+  }
+}
+
+/* Description Box */
+.description-box {
+  background: rgba(16, 185, 129, 0.05);
+  border: 1px dashed var(--primary);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-top: 8px;
+  font-size: 0.825rem;
+  color: var(--text-main);
+  text-align: left;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+body.light-mode .description-box {
+  background: rgba(16, 185, 129, 0.04);
+  border-color: var(--primary);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Checkbox specific styling */
+input[type="checkbox"].desc-checkbox {
+  width: 14px !important;
+  height: 14px !important;
+  min-width: auto !important;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
+@media (max-width: 768px) {
+  .responsive-table td input[type="checkbox"].desc-checkbox {
+    width: 14px !important;
+    height: 14px !important;
+    min-width: auto !important;
+    margin: 0 !important;
+  }
+  
+  .responsive-table td .desc-checkbox-container {
+    margin-top: 4px !important;
+  }
+}

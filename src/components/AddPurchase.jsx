@@ -19,9 +19,9 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
       purchaseDate: new Date().toISOString().split('T')[0],
       amountTaken: '',
       items: [
-        { id: Date.now(), itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '' },
-        { id: Date.now() + 1, itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '' },
-        { id: Date.now() + 2, itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '' }
+        { id: Date.now(), itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '', hasDescription: false, description: '' },
+        { id: Date.now() + 1, itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '', hasDescription: false, description: '' },
+        { id: Date.now() + 2, itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '', hasDescription: false, description: '' }
       ]
     });
   };
@@ -124,7 +124,7 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
   const addRow = () => {
     setActiveRowId(null);
     setFilteredSuggestions([]);
-    setItems([...items, { id: Date.now(), itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '' }]);
+    setItems([...items, { id: Date.now(), itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '', hasDescription: false, description: '' }]);
   };
 
   const addRowRef = React.useRef(addRow);
@@ -348,7 +348,8 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
           price_per_unit: parseFloat(item.pricePerUnit) || 0,
           total_amount: parseFloat(item.totalAmount) || 0,
           purchase_date: new Date(purchaseDate).toISOString(),
-          receipt_id: receiptId
+          receipt_id: receiptId,
+          description: item.hasDescription ? item.description : null
         };
       });
       
@@ -378,9 +379,9 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
         purchaseDate: new Date().toISOString().split('T')[0],
         amountTaken: '',
         items: [
-          { id: Date.now(), itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '' },
-          { id: Date.now() + 1, itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '' },
-          { id: Date.now() + 2, itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '' }
+          { id: Date.now(), itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '', hasDescription: false, description: '' },
+          { id: Date.now() + 1, itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '', hasDescription: false, description: '' },
+          { id: Date.now() + 2, itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '', hasDescription: false, description: '' }
         ]
       });
       if (onAdded) onAdded();
@@ -474,15 +475,40 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
                     <span className="serial-number">[ {index + 1} ]</span>
                   </td>
                   <td style={{ position: 'relative' }}>
-                    <input 
-                      placeholder="Item Name" 
-                      value={item.itemName} 
-                      onChange={e => handleItemChange(item.id, 'itemName', e.target.value)} 
-                      onKeyDown={e => handleKeyDown(e, item.id)}
-                      onBlur={() => setTimeout(() => setActiveRowId(null), 200)}
-                      autoComplete="off" 
-                      style={{ textAlign: 'center' }}
-                    />
+                    <div className="item-name-cell-content">
+                      <input 
+                        placeholder="Item Name" 
+                        value={item.itemName} 
+                        onChange={e => handleItemChange(item.id, 'itemName', e.target.value)} 
+                        onKeyDown={e => handleKeyDown(e, item.id)}
+                        onBlur={() => setTimeout(() => setActiveRowId(null), 200)}
+                        autoComplete="off" 
+                        className="item-name-input"
+                        style={{ textAlign: 'left' }}
+                      />
+                      <div className="desc-checkbox-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '6px', gap: '6px' }}>
+                        <input 
+                          type="checkbox" 
+                          id={`desc-toggle-${item.id}`}
+                          checked={item.hasDescription || false} 
+                          onChange={e => handleItemChange(item.id, 'hasDescription', e.target.checked)} 
+                          className="desc-checkbox"
+                          style={{ margin: 0 }}
+                        />
+                        <label htmlFor={`desc-toggle-${item.id}`} style={{ fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-muted)', userSelect: 'none' }}>
+                          add description
+                        </label>
+                      </div>
+                      {item.hasDescription && (
+                        <input 
+                          placeholder="colour, brand, size..." 
+                          value={item.description || ''} 
+                          onChange={e => handleItemChange(item.id, 'description', e.target.value)} 
+                          className="item-desc-input"
+                          style={{ marginTop: '6px', fontSize: '0.8rem', textAlign: 'center', padding: '4px 8px' }}
+                        />
+                      )}
+                    </div>
                     {activeRowId === item.id && filteredSuggestions.length > 0 && (
                       <div className="custom-suggestions">
                         {filteredSuggestions.map((suggestion, idx) => (

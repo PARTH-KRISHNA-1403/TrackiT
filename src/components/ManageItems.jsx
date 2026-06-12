@@ -142,12 +142,15 @@ export default function ManageItems() {
 
   const handleEditSave = async () => {
     try {
+      const parsedSizeValue = editData.size_value && String(editData.size_value).trim() !== '' ? parseFloat(editData.size_value) : null;
+      const parsedSizeUnit = editData.size_unit || null;
+
       const { error } = await supabase.from('items').update({
         name: editData.name,
         category: editData.category,
-        size_value: editData.size_value,
-        size_unit: editData.size_unit,
-        default_unit: editData.size_unit // Keep default_unit synced for backward compatibility
+        size_value: parsedSizeValue,
+        size_unit: parsedSizeUnit,
+        default_unit: parsedSizeUnit || 'unit'
       }).eq('id', editingId);
 
       if (!error) {
@@ -250,9 +253,21 @@ export default function ManageItems() {
         </form>
       </div>
 
-      <div className="glass-card">
+       <div className="glass-card">
         <div className="flex-between" style={{ marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-          <h2><Package size={24} style={{verticalAlign: 'middle', marginRight: '8px'}} /> Saved Items</h2>
+          <h2 
+            onClick={() => {
+              if (visibleCategories.size === categories.length) {
+                setVisibleCategories(new Set());
+              } else {
+                setVisibleCategories(new Set(categories));
+              }
+            }} 
+            style={{ cursor: 'pointer', userSelect: 'none' }}
+            title="Click to toggle all categories"
+          >
+            <Package size={24} style={{ verticalAlign: 'middle', marginRight: '8px' }} /> Saved Items
+          </h2>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             {categories.map(cat => (
               <button 
@@ -331,9 +346,9 @@ export default function ManageItems() {
                             </div>
                           )}
                         </div>
-                        <div style={{ display: 'flex', gap: '0.2rem', alignItems: 'center' }}>
-                          <input type="number" step="any" style={{ width: '110px' }} value={editData.size_value} onChange={e => setEditData({...editData, size_value: e.target.value})} />
-                          <select style={{ width: '85px' }} value={editData.size_unit} onChange={e => setEditData({...editData, size_unit: e.target.value})}>
+                         <div style={{ display: 'flex', gap: '0.2rem', alignItems: 'center' }}>
+                          <input type="number" step="any" style={{ width: '110px' }} value={editData.size_value || ''} onChange={e => setEditData({...editData, size_value: e.target.value})} />
+                          <select style={{ width: '85px' }} value={editData.size_unit || ''} onChange={e => setEditData({...editData, size_unit: e.target.value})}>
                             <option value="">None</option>
                             <option value="unit">unit</option>
                             <option value="kg">kg</option>
