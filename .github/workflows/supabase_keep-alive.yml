@@ -10,23 +10,24 @@ jobs:
   ping-database:
     runs-on: ubuntu-latest
     steps:
-      - name: Send API Ping to Supabase
+      - name: Ping Supabase Gateway
         env:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: |
-          # Strip trailing slash from URL if present
           CLEAN_URL="${SUPABASE_URL%/}"
 
+          echo "Pinging Supabase at ${CLEAN_URL}..."
+
+          # Sends a keep-alive ping through the Supabase API Gateway
           RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
-            -X GET "${CLEAN_URL}/rest/v1/" \
-            -H "apikey: ${SUPABASE_ANON_KEY}" \
-            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}")
+            -X GET "${CLEAN_URL}/auth/v1/health" \
+            -H "apikey: ${SUPABASE_ANON_KEY}")
 
           echo "Supabase HTTP response code: $RESPONSE"
 
-          if [ "$RESPONSE" -ge 200 ] && [ "$RESPONSE" -lt 400 ]; then
-            echo "Database active: ping successful."
+          if [ "$RESPONSE" -eq 200 ]; then
+            echo "Database gateway active: ping successful."
             exit 0
           else
             echo "Error: Received HTTP status $RESPONSE"
