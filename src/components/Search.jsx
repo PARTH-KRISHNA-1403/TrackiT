@@ -60,7 +60,8 @@ export default function Search({ onPurchaseClick, purchases, onEditReceipt, onRe
     'Mandoli': filteredReceipts.filter(r => r.source === 'Mandoli'),
     'Canteen': filteredReceipts.filter(r => r.source === 'Canteen'),
     'Friday-Market': filteredReceipts.filter(r => r.source === 'Friday-Market'),
-    'others': filteredReceipts.filter(r => !['Mandoli', 'Canteen', 'Friday-Market'].includes(r.source))
+    'Surplus': filteredReceipts.filter(r => r.source === 'Surplus'),
+    'others': filteredReceipts.filter(r => !['Mandoli', 'Canteen', 'Friday-Market', 'Surplus'].includes(r.source))
   };
 
 

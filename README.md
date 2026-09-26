@@ -115,30 +115,30 @@ npm run build
 
 The app expects two tables in your Supabase project:
 
-### `items`
+### `item_list`
 
 | Column | Type | Description |
 |---|---|---|
 | `id` | `int8` (PK) | Auto-generated item ID |
+| `qr_id` | `text` | QR ID — *nullable* |
 | `name` | `text` | Item name (e.g., "Milk") |
 | `category` | `text` | Category (e.g., "Dairy") |
-| `size_value` | `float` | Package size value (e.g., 500) — *nullable* |
-| `size_unit` | `text` | Package size unit (e.g., "ml") — *nullable* |
-| `default_unit` | `text` | Default measurement unit (e.g., "kg", "unit") |
+| `size_unit` | `varchar` | Package size unit (e.g., "g", "ml") — *nullable* |
+| `size_qty` | `float8` | Package size quantity (e.g., 500) — *nullable* |
 
 ### `purchases`
 
 | Column | Type | Description |
 |---|---|---|
 | `id` | `int8` (PK) | Auto-generated purchase ID |
-| `item_id` | `int8` (FK → items) | Reference to the purchased item |
-| `source` | `text` | Store/vendor name (e.g., "Canteen") |
-| `quantity` | `float` | Quantity purchased |
-| `price_per_unit` | `float` | Price per unit/packet |
-| `total_amount` | `float` | Total cost for this line item |
-| `purchase_date` | `timestamptz` | Date of purchase |
-| `receipt_id` | `text` | Groups items into a single receipt |
-| `description` | `text` | Custom one-time item description (e.g., brand, color) — *nullable* |
+| `purchase_date` | `date` | Date of purchase |
+| `source_name` | `text` | Store/vendor name (e.g., "Canteen", "Mandoli") |
+| `invoice_number` | `text` | Groups items into a single invoice/receipt |
+| `item_id` | `int8` (FK → item_list) | Reference to the purchased item |
+| `unit_price` | `numeric` | Price per unit/packet |
+| `quantity` | `numeric` | Quantity purchased |
+| `total_amount` | `numeric` | Total cost for this line item — *nullable* |
+
 
 ---
 

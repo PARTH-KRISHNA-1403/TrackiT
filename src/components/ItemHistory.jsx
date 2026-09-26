@@ -11,7 +11,7 @@ export default function ItemHistory({ item, onReceiptClick }) {
     if (item) {
       supabase
         .from('purchases')
-        .select('purchase_date, price_per_unit, source, receipt_id, quantity, total_amount')
+        .select('*')
         .eq('item_id', item.item_id)
         .order('purchase_date', { ascending: true })
         .then(({ data }) => {
@@ -19,9 +19,9 @@ export default function ItemHistory({ item, onReceiptClick }) {
             const formatted = data.map(d => ({
               date: new Date(d.purchase_date).toLocaleDateString('en-GB'),
               rawDate: d.purchase_date,
-              price: parseFloat(d.price_per_unit),
-              source: d.source,
-              receiptId: d.receipt_id,
+              price: parseFloat(d.unit_price !== undefined && d.unit_price !== null ? d.unit_price : d.price_per_unit),
+              source: d.source_name || d.source,
+              receiptId: d.invoice_number || d.receipt_id,
               quantity: parseFloat(d.quantity),
               totalAmount: parseFloat(d.total_amount)
             }));

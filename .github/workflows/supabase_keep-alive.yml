@@ -10,26 +10,44 @@ jobs:
   ping-database:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase Gateway
+      - name: Ping Supabase Services
         env:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::error:: Missing secrets! Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are configured in GitHub Repository Secrets."
+            exit 1
+          fi
+
           CLEAN_URL="${SUPABASE_URL%/}"
+          echo "Pinging Supabase at: ${CLEAN_URL}"
 
-          echo "Pinging Supabase at ${CLEAN_URL}..."
-
-          # Sends a keep-alive ping through the Supabase API Gateway
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+          # 1. Ping Auth Service Health
+          echo "--- Pinging Auth Gateway ---"
+          AUTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -X GET "${CLEAN_URL}/auth/v1/health" \
             -H "apikey: ${SUPABASE_ANON_KEY}")
 
-          echo "Supabase HTTP response code: $RESPONSE"
+          echo "Auth Gateway HTTP status: ${AUTH_STATUS}"
 
-          if [ "$RESPONSE" -eq 200 ]; then
-            echo "Database gateway active: ping successful."
+          # 2. Query PostgREST Database (item_list table)
+          echo "--- Querying Database (PostgREST) ---"
+          REST_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X GET "${CLEAN_URL}/rest/v1/item_list?select=id&limit=1" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}")
+
+          echo "Database API HTTP status: ${REST_STATUS}"
+
+          if [ "$AUTH_STATUS" -eq 200 ] || [ "$REST_STATUS" -eq 200 ]; then
+            echo "✅ Supabase project is active and keep-alive ping succeeded!"
             exit 0
           else
-            echo "Error: Received HTTP status $RESPONSE"
+            echo "::error:: Failed to ping Supabase. Auth Status: ${AUTH_STATUS}, DB Status: ${REST_STATUS}"
+            echo "Detailed DB response:"
+            curl -i -s -X GET "${CLEAN_URL}/rest/v1/item_list?select=id&limit=1" \
+              -H "apikey: ${SUPABASE_ANON_KEY}" \
+              -H "Authorization: Bearer ${SUPABASE_ANON_KEY}"
             exit 1
           fi

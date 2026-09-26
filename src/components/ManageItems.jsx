@@ -70,9 +70,13 @@ export default function ManageItems() {
 
   const fetchItems = async () => {
     try {
-      const { data } = await supabase.from('items').select('*').order('name');
+      const { data } = await supabase.from('item_list').select('*').order('name');
       if (data) {
-        setItems(data);
+        const formatted = data.map(item => ({
+          ...item,
+          size_value: item.size_qty !== undefined && item.size_qty !== null ? item.size_qty : item.size_value
+        }));
+        setItems(formatted);
       }
     } catch (err) {
       console.error('Failed to fetch items', err);
@@ -81,10 +85,11 @@ export default function ManageItems() {
 
   const fetchCategories = async () => {
     try {
-      const { data } = await supabase.from('items').select('category');
+      const { data } = await supabase.from('item_list').select('category');
       if (data) {
         const uniqueCategories = [...new Set(data.map(i => i.category).filter(Boolean))].sort();
         setCategories(uniqueCategories);
+        setVisibleCategories(new Set(uniqueCategories));
       }
     } catch (err) {
       console.error('Failed to fetch categories', err);
@@ -102,6 +107,8 @@ export default function ManageItems() {
     else newSet.add(cat);
     setVisibleCategories(newSet);
   };
+
+  const isCategoryVisible = (cat) => visibleCategories.size === 0 || visibleCategories.has(cat);
 
   const groupedItems = items.reduce((acc, item) => {
     const cat = item.category || 'General';
@@ -122,7 +129,7 @@ export default function ManageItems() {
     if (!window.confirm('Are you sure you want to delete the selected items?')) return;
     
     try {
-      const { error } = await supabase.from('items').delete().in('id', Array.from(selectedIds));
+      const { error } = await supabase.from('item_list').delete().in('id', Array.from(selectedIds));
       if (!error) {
         setSelectedIds(new Set());
         fetchItems();
@@ -142,15 +149,15 @@ export default function ManageItems() {
 
   const handleEditSave = async () => {
     try {
-      const parsedSizeValue = editData.size_value && String(editData.size_value).trim() !== '' ? parseFloat(editData.size_value) : null;
+      const rawVal = editData.size_qty !== undefined ? editData.size_qty : editData.size_value;
+      const parsedSizeQty = rawVal && String(rawVal).trim() !== '' ? parseFloat(rawVal) : null;
       const parsedSizeUnit = editData.size_unit || null;
 
-      const { error } = await supabase.from('items').update({
+      const { error } = await supabase.from('item_list').update({
         name: editData.name,
         category: editData.category,
-        size_value: parsedSizeValue,
-        size_unit: parsedSizeUnit,
-        default_unit: parsedSizeUnit || 'unit'
+        size_qty: parsedSizeQty,
+        size_unit: parsedSizeUnit
       }).eq('id', editingId);
 
       if (!error) {
@@ -168,12 +175,11 @@ export default function ManageItems() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const { error } = await supabase.from('items').insert([{
+      const { error } = await supabase.from('item_list').insert([{
         name: formData.name,
         category: formData.category,
-        size_value: formData.sizeValue ? parseFloat(formData.sizeValue) : null,
-        size_unit: formData.sizeUnit || null,
-        default_unit: formData.sizeUnit || 'unit'
+        size_qty: formData.sizeValue ? parseFloat(formData.sizeValue) : null,
+        size_unit: formData.sizeUnit || null
       }]);
 
       if (!error) {
@@ -233,19 +239,29 @@ export default function ManageItems() {
             )}
           </div>
           <div className="form-group">
-            <label>Size / Weight Value (Optional)</label>
-            <input type="number" step="any" placeholder="e.g., 500" value={formData.sizeValue} onChange={e => setFormData({...formData, sizeValue: e.target.value})} />
-          </div>
-          <div className="form-group">
-            <label>Size Unit</label>
-            <select value={formData.sizeUnit} onChange={e => setFormData({...formData, sizeUnit: e.target.value})}>
-              <option value="">None</option>
-              <option value="unit">unit</option>
-              <option value="kg">kg</option>
-              <option value="g">g</option>
-              <option value="L">L</option>
-              <option value="ml">ml</option>
-            </select>
+            <label>Size & Unit (Optional)</label>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <input 
+                type="number" 
+                step="any" 
+                placeholder="Size (e.g. 500)" 
+                value={formData.sizeValue} 
+                onChange={e => setFormData({...formData, sizeValue: e.target.value})} 
+                style={{ flex: 1, borderTopRightRadius: 0, borderBottomRightRadius: 0, borderRight: 'none' }} 
+              />
+              <select 
+                value={formData.sizeUnit} 
+                onChange={e => setFormData({...formData, sizeUnit: e.target.value})}
+                style={{ width: '90px', borderTopLeftRadius: 0, borderBottomLeftRadius: 0, paddingLeft: '4px', paddingRight: '4px' }}
+              >
+                <option value="">Unit</option>
+                <option value="Pc.">Pc.</option>
+                <option value="kg">kg</option>
+                <option value="g">g</option>
+                <option value="L">L</option>
+                <option value="ml">ml</option>
+              </select>
+            </div>
           </div>
           <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end', gridColumn: 'span 2' }}>
             <button type="submit" className="btn btn-primary" style={{width: '100%'}}>Save Item Variant</button>
@@ -295,7 +311,7 @@ export default function ManageItems() {
 
         <div className="purchase-list">
           {Object.entries(groupedItems).map(([category, catItems]) => (
-            visibleCategories.has(category) && (
+            isCategoryVisible(category) && (
               <div key={category} style={{ marginBottom: '2rem' }}>
                 <h3 style={{ 
                   fontSize: '0.9rem', 
@@ -350,7 +366,7 @@ export default function ManageItems() {
                           <input type="number" step="any" style={{ width: '110px' }} value={editData.size_value || ''} onChange={e => setEditData({...editData, size_value: e.target.value})} />
                           <select style={{ width: '85px' }} value={editData.size_unit || ''} onChange={e => setEditData({...editData, size_unit: e.target.value})}>
                             <option value="">None</option>
-                            <option value="unit">unit</option>
+                            <option value="Pc.">Pc.</option>
                             <option value="kg">kg</option>
                             <option value="g">g</option>
                             <option value="L">L</option>

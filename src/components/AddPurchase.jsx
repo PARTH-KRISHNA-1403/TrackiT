@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { PlusCircle, Trash2 } from 'lucide-react';
+import { PlusCircle, Trash2, RotateCcw } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
-export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId, setEditingReceiptId }) {
+export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId, setEditingReceiptId, onCancelEdit }) {
   const { source, purchaseDate, amountTaken, items } = draft;
   const [savedItems, setSavedItems] = useState([]);
   const [categories, setCategories] = useState([]);
-
   const setSource = (val) => setDraft({ ...draft, source: val });
   const setPurchaseDate = (val) => setDraft({ ...draft, purchaseDate: val });
   const setAmountTaken = (val) => setDraft({ ...draft, amountTaken: val });
@@ -19,9 +18,9 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
       purchaseDate: new Date().toISOString().split('T')[0],
       amountTaken: '',
       items: [
-        { id: Date.now(), itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '', hasDescription: false, description: '' },
-        { id: Date.now() + 1, itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '', hasDescription: false, description: '' },
-        { id: Date.now() + 2, itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '', hasDescription: false, description: '' }
+        { id: Date.now(), itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: '', pricePerUnit: '', totalAmount: '' },
+        { id: Date.now() + 1, itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: '', pricePerUnit: '', totalAmount: '' },
+        { id: Date.now() + 2, itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: '', pricePerUnit: '', totalAmount: '' }
       ]
     });
   };
@@ -36,12 +35,16 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
   useEffect(() => {
     const fetchItemsAndCategories = async () => {
       const { data: items } = await supabase
-        .from('items')
+        .from('item_list')
         .select('*');
-        
+
       if (items) {
-        setSavedItems(items);
-        const uniqueCategories = [...new Set(items.map(i => i.category).filter(Boolean))].sort();
+        const formatted = items.map(i => ({
+          ...i,
+          size_value: i.size_qty !== undefined && i.size_qty !== null ? i.size_qty : i.size_value
+        }));
+        setSavedItems(formatted);
+        const uniqueCategories = [...new Set(formatted.map(i => i.category).filter(Boolean))].sort();
         setCategories(uniqueCategories);
       }
     };
@@ -52,11 +55,11 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
     setItems(items.map(item => {
       if (item.id === id) {
         const updatedItem = { ...item, [field]: value };
-        
+
         if (field === 'itemName') {
           // Update suggestions
           if (value.trim().length > 0) {
-            const matches = savedItems.filter(i => 
+            const matches = savedItems.filter(i =>
               i.name.toLowerCase().includes(value.toLowerCase())
             ).slice(0, 3);
             setFilteredSuggestions(matches);
@@ -111,10 +114,8 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
       if (item.id === id) {
         const val = parseFloat(item[field]);
         if (!isNaN(val)) {
-          if (field === 'quantity' && item.sizeValue && item.sizeUnit) {
-            return { ...item, [field]: String(Math.round(val)) };
-          }
-          return { ...item, [field]: val.toFixed(1) };
+          const formattedVal = Number.isInteger(val) ? String(val) : String(parseFloat(val.toFixed(1)));
+          return { ...item, [field]: formattedVal };
         }
       }
       return item;
@@ -124,7 +125,7 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
   const addRow = () => {
     setActiveRowId(null);
     setFilteredSuggestions([]);
-    setItems([...items, { id: Date.now(), itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '', hasDescription: false, description: '' }]);
+    setItems([...items, { id: Date.now(), itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: '', pricePerUnit: '', totalAmount: '' }]);
   };
 
   const addRowRef = React.useRef(addRow);
@@ -187,7 +188,9 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
     }
   };
 
-  const filteredSources = ['Canteen', 'Mandoli', 'Friday-Market'].filter(s => !source || s.toLowerCase().includes(source.toLowerCase()));
+  const filteredSources = source && source.trim().length > 0
+    ? ['Canteen', 'Mandoli', 'Friday-Market', 'Surplus'].filter(s => s.toLowerCase().includes(source.trim().toLowerCase()))
+    : [];
   const handleSourceKeyDown = (e) => {
     if (!showSourceSuggestions || filteredSources.length === 0) return;
 
@@ -246,7 +249,7 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
     e.preventDefault();
     try {
       const receiptId = editingReceiptId || generateReceiptId();
-      
+
       // Filter out empty rows
       const validItems = items.filter(item => item.itemName && item.itemName.trim() !== '');
 
@@ -277,14 +280,14 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
         const querySizeUnit = item.sizeUnit || null;
 
         let query = supabase
-          .from('items')
+          .from('item_list')
           .select('id')
           .eq('name', cleanName);
 
         if (querySizeVal !== null) {
-          query = query.eq('size_value', querySizeVal);
+          query = query.eq('size_qty', querySizeVal);
         } else {
-          query = query.is('size_value', null);
+          query = query.is('size_qty', null);
         }
 
         if (querySizeUnit !== null) {
@@ -294,36 +297,35 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
         }
 
         let { data: existingItems } = await query;
-          
+
         let itemId;
         if (existingItems && existingItems.length > 0) {
           itemId = existingItems[0].id;
         } else {
           const { data: newItem, error: insertError } = await supabase
-            .from('items')
+            .from('item_list')
             .insert([{
               name: cleanName,
               category: item.category || 'General',
-              size_value: querySizeVal,
-              size_unit: querySizeUnit,
-              default_unit: querySizeUnit || 'unit'
+              size_qty: querySizeVal,
+              size_unit: querySizeUnit
             }])
             .select();
-            
+
           if (insertError) throw insertError;
-          
+
           if (newItem && newItem.length > 0) {
             itemId = newItem[0].id;
           } else {
             let fallbackQuery = supabase
-              .from('items')
+              .from('item_list')
               .select('id')
               .eq('name', cleanName);
 
             if (querySizeVal !== null) {
-              fallbackQuery = fallbackQuery.eq('size_value', querySizeVal);
+              fallbackQuery = fallbackQuery.eq('size_qty', querySizeVal);
             } else {
-              fallbackQuery = fallbackQuery.is('size_value', null);
+              fallbackQuery = fallbackQuery.is('size_qty', null);
             }
 
             if (querySizeUnit !== null) {
@@ -340,31 +342,30 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
             }
           }
         }
-        
+
         return {
           item_id: itemId,
-          source: source,
+          source_name: source,
           quantity: parseFloat(item.quantity) || 0,
-          price_per_unit: parseFloat(item.pricePerUnit) || 0,
+          unit_price: parseFloat(item.pricePerUnit) || 0,
           total_amount: parseFloat(item.totalAmount) || 0,
-          purchase_date: new Date(purchaseDate).toISOString(),
-          receipt_id: receiptId,
-          description: item.hasDescription ? item.description : null
+          purchase_date: purchaseDate,
+          invoice_number: receiptId
         };
       });
-      
+
       const purchasesToInsert = (await Promise.all(itemInserts)).filter(Boolean);
-      
+
       if (purchasesToInsert.length === 0) {
         alert('Please add at least one item to the receipt.');
         return;
       }
-      
+
       if (editingReceiptId) {
         const { error: deleteError } = await supabase
           .from('purchases')
           .delete()
-          .eq('receipt_id', editingReceiptId);
+          .or(`invoice_number.eq.${editingReceiptId},receipt_id.eq.${editingReceiptId}`);
         if (deleteError) throw deleteError;
       }
 
@@ -379,9 +380,9 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
         purchaseDate: new Date().toISOString().split('T')[0],
         amountTaken: '',
         items: [
-          { id: Date.now(), itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '', hasDescription: false, description: '' },
-          { id: Date.now() + 1, itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '', hasDescription: false, description: '' },
-          { id: Date.now() + 2, itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: 1, pricePerUnit: '', totalAmount: '', hasDescription: false, description: '' }
+          { id: Date.now(), itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: '', pricePerUnit: '', totalAmount: '' },
+          { id: Date.now() + 1, itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: '', pricePerUnit: '', totalAmount: '' },
+          { id: Date.now() + 2, itemName: '', category: '', sizeValue: '', sizeUnit: '', quantity: '', pricePerUnit: '', totalAmount: '' }
         ]
       });
       if (onAdded) onAdded();
@@ -394,15 +395,16 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
   return (
     <div className="glass-card animate-fade-in">
       <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
-        <h2><PlusCircle size={24} style={{verticalAlign: 'middle', marginRight: '8px'}} /> {editingReceiptId ? `Edit Receipt #${editingReceiptId}` : 'Add New Receipt'}</h2>
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <h2><PlusCircle size={24} style={{ verticalAlign: 'middle', marginRight: '8px' }} /> {editingReceiptId ? `Edit Receipt #${editingReceiptId}` : 'Add New Receipt'}</h2>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           {editingReceiptId && (
             <button type="button" className="btn" onClick={() => { if (setEditingReceiptId) setEditingReceiptId(null); resetForm(); }} style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-main)', border: '1px solid var(--border-color)', fontSize: '0.8rem', padding: '4px 12px' }}>
               Cancel Edit
             </button>
           )}
-          <button type="button" className="btn" onClick={resetForm} style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', fontSize: '0.8rem', padding: '4px 12px' }}>
-            Reset Form
+          <button type="button" className="btn-reset-form" onClick={resetForm}>
+            <RotateCcw size={16} />
+            <span>Reset Form</span>
           </button>
         </div>
       </div>
@@ -410,46 +412,49 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
         <div className="grid-2" style={{ marginBottom: '1.5rem' }}>
           <div className="form-group" style={{ position: 'relative' }}>
             <label>Source</label>
-            <input 
-              placeholder="e.g., Canteen, Mandoli" 
-              value={source} 
+            <input
+              placeholder="Select Source..."
+              value={source}
               onChange={e => {
                 setSource(e.target.value);
                 setSourceSelectedIndex(0);
-              }} 
+              }}
               onFocus={() => setShowSourceSuggestions(true)}
               onBlur={() => setTimeout(() => setShowSourceSuggestions(false), 200)}
               onKeyDown={handleSourceKeyDown}
               autoComplete="off"
             />
-            {showSourceSuggestions && (
+            {showSourceSuggestions && filteredSources.length > 0 && (
               <div className="custom-suggestions dropdown">
-                {['Canteen', 'Mandoli', 'Friday-Market']
-                  .filter(s => !source || s.toLowerCase().includes(source.toLowerCase()))
-                  .map((s, idx, arr) => {
-                    const safeIndex = sourceSelectedIndex >= arr.length ? 0 : sourceSelectedIndex;
-                    return (
-                      <div 
-                        key={idx} 
-                        className={`suggestion-item ${idx === safeIndex ? 'active' : ''}`} 
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          setSource(s);
-                          setShowSourceSuggestions(false);
-                        }}
-                        onMouseEnter={() => setSourceSelectedIndex(idx)}
-                      >
-                        {s}
-                      </div>
-                    );
-                  })
-                }
+                {filteredSources.map((s, idx) => {
+                  const safeIndex = sourceSelectedIndex >= filteredSources.length ? 0 : sourceSelectedIndex;
+                  return (
+                    <div
+                      key={idx}
+                      className={`suggestion-item ${idx === safeIndex ? 'active' : ''}`}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setSource(s);
+                        setShowSourceSuggestions(false);
+                      }}
+                      onMouseEnter={() => setSourceSelectedIndex(idx)}
+                    >
+                      {s}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
           <div className="form-group">
             <label>Purchase Date</label>
-            <input type="date" required value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} />
+            <input
+              type="date"
+              required
+              value={purchaseDate}
+              onChange={e => setPurchaseDate(e.target.value)}
+              onClick={(e) => e.target.showPicker && e.target.showPicker()}
+            />
           </div>
         </div>
 
@@ -457,14 +462,13 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
           <table className="receipt-table responsive-table">
             <thead>
               <tr>
-                <th style={{ width: '5%', textAlign: 'center' }}>S.no.</th>
-                <th style={{ width: '20%', textAlign: 'center' }}>Item</th>
-                <th style={{ width: '15%', textAlign: 'center' }}>Category</th>
-                <th style={{ width: '10%', textAlign: 'center' }}>Size</th>
-                <th style={{ width: '10%', textAlign: 'center' }}>Unit</th>
-                <th style={{ width: '10%', textAlign: 'center' }}>Qty.</th>
-                <th style={{ width: '12%', textAlign: 'center' }}>Rate</th>
-                <th style={{ width: '13%', textAlign: 'center' }}>Amt</th>
+                <th style={{ width: '6%', textAlign: 'center' }}>S.NO.</th>
+                <th style={{ width: '22%', textAlign: 'left' }}>ITEM NAME</th>
+                <th style={{ width: '15%', textAlign: 'center' }}>CATEGORY</th>
+                <th style={{ width: '18%', textAlign: 'center' }}>SIZE & UNIT</th>
+                <th style={{ width: '10%', textAlign: 'center' }}>QTY.</th>
+                <th style={{ width: '12%', textAlign: 'center' }}>RATE (₹)</th>
+                <th style={{ width: '12%', textAlign: 'center' }}>AMT (₹)</th>
                 <th style={{ width: '5%' }}></th>
               </tr>
             </thead>
@@ -476,43 +480,21 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
                   </td>
                   <td style={{ position: 'relative' }}>
                     <div className="item-name-cell-content">
-                      <input 
-                        placeholder="Item Name" 
-                        value={item.itemName} 
-                        onChange={e => handleItemChange(item.id, 'itemName', e.target.value)} 
+                      <input
+                        placeholder="Type or select product..."
+                        value={item.itemName}
+                        onChange={e => handleItemChange(item.id, 'itemName', e.target.value)}
                         onKeyDown={e => handleKeyDown(e, item.id)}
                         onBlur={() => setTimeout(() => setActiveRowId(null), 200)}
-                        autoComplete="off" 
+                        autoComplete="off"
                         className="item-name-input"
                         style={{ textAlign: 'left' }}
                       />
-                      <div className="desc-checkbox-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '6px', gap: '6px' }}>
-                        <input 
-                          type="checkbox" 
-                          id={`desc-toggle-${item.id}`}
-                          checked={item.hasDescription || false} 
-                          onChange={e => handleItemChange(item.id, 'hasDescription', e.target.checked)} 
-                          className="desc-checkbox"
-                          style={{ margin: 0 }}
-                        />
-                        <label htmlFor={`desc-toggle-${item.id}`} style={{ fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-muted)', userSelect: 'none' }}>
-                          add description
-                        </label>
-                      </div>
-                      {item.hasDescription && (
-                        <input 
-                          placeholder="colour, brand, size..." 
-                          value={item.description || ''} 
-                          onChange={e => handleItemChange(item.id, 'description', e.target.value)} 
-                          className="item-desc-input"
-                          style={{ marginTop: '6px', fontSize: '0.8rem', textAlign: 'center', padding: '4px 8px' }}
-                        />
-                      )}
                     </div>
                     {activeRowId === item.id && filteredSuggestions.length > 0 && (
                       <div className="custom-suggestions">
                         {filteredSuggestions.map((suggestion, idx) => (
-                          <div 
+                          <div
                             key={suggestion.id}
                             className={`suggestion-item ${idx === selectedIndex ? 'active' : ''}`}
                             onMouseDown={(e) => {
@@ -531,18 +513,18 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
                     )}
                   </td>
                   <td style={{ position: 'relative' }}>
-                    <input 
-                      placeholder="Category" 
-                      value={item.category} 
+                    <input
+                      placeholder="General"
+                      value={item.category}
                       onChange={e => {
                         handleItemChange(item.id, 'category', e.target.value);
                         setCategorySelectedIndex(0);
-                      }} 
+                      }}
                       onFocus={() => setActiveCategoryRowId(item.id)}
                       onBlur={() => setTimeout(() => setActiveCategoryRowId(null), 200)}
                       onKeyDown={e => handleCategoryKeyDown(e, item)}
-                      autoComplete="off" 
-                      style={{ textAlign: 'center' }} 
+                      autoComplete="off"
+                      style={{ textAlign: 'center' }}
                     />
                     {activeCategoryRowId === item.id && (
                       <div className="custom-suggestions">
@@ -551,8 +533,8 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
                           .map((cat, idx, arr) => {
                             const safeIndex = categorySelectedIndex >= arr.length ? 0 : categorySelectedIndex;
                             return (
-                              <div 
-                                key={idx} 
+                              <div
+                                key={idx}
                                 className={`suggestion-item ${idx === safeIndex ? 'active' : ''}`}
                                 onMouseDown={(e) => {
                                   e.preventDefault();
@@ -570,56 +552,78 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
                     )}
                   </td>
                   <td>
-                    <input type="number" step="any" placeholder="Size" value={item.sizeValue} onChange={e => handleItemChange(item.id, 'sizeValue', e.target.value)} style={{ textAlign: 'center' }} />
+                    <div className="size-unit-merged-field">
+                      <input
+                        type="number"
+                        step="1"
+                        placeholder="Size"
+                        value={item.sizeValue}
+                        onChange={e => handleItemChange(item.id, 'sizeValue', e.target.value)}
+                        className="size-input-part"
+                      />
+                      <div className="size-unit-divider"></div>
+                      <select
+                        value={(() => {
+                          if (!item.sizeUnit) return '';
+                          const l = String(item.sizeUnit).trim().toLowerCase();
+                          if (l === 'kg') return 'kg';
+                          if (l === 'g') return 'g';
+                          if (l === 'l') return 'L';
+                          if (l === 'ml') return 'ml';
+                          if (l.startsWith('unit') || l.startsWith('pc') || l.startsWith('piece')) return 'Pc.';
+                          return item.sizeUnit;
+                        })()}
+                        onChange={e => handleItemChange(item.id, 'sizeUnit', e.target.value)}
+                        className="unit-select-part"
+                      >
+                        <option value="">Unit</option>
+                        <option value="Pc.">Pc.</option>
+                        <option value="kg">kg</option>
+                        <option value="g">g</option>
+                        <option value="L">L</option>
+                        <option value="ml">ml</option>
+                      </select>
+                    </div>
                   </td>
                   <td>
-                    <select value={item.sizeUnit} onChange={e => handleItemChange(item.id, 'sizeUnit', e.target.value)} style={{ textAlign: 'center' }}>
-                      <option value="">None</option>
-                      <option value="unit">unit</option>
-                      <option value="kg">kg</option>
-                      <option value="g">g</option>
-                      <option value="L">L</option>
-                      <option value="ml">ml</option>
-                    </select>
-                  </td>
-                  <td>
-                    <input 
-                      type="number" 
-                      step="0.1" 
-                      value={item.quantity} 
-                      onChange={e => handleItemChange(item.id, 'quantity', e.target.value)} 
+                    <input
+                      type="number"
+                      step="1"
+                      placeholder="0"
+                      value={item.quantity}
+                      onChange={e => handleItemChange(item.id, 'quantity', e.target.value)}
                       onBlur={() => handleBlur(item.id, 'quantity')}
-                      style={{ textAlign: 'center' }} 
+                      style={{ textAlign: 'center' }}
                     />
                   </td>
                   <td>
-                    <input type="number" step="0.1" placeholder="₹ 0.0" value={item.pricePerUnit} onChange={e => handleItemChange(item.id, 'pricePerUnit', e.target.value)} onBlur={() => handleBlur(item.id, 'pricePerUnit')} style={{ textAlign: 'center' }} />
+                    <input type="number" step="1" placeholder="0" value={item.pricePerUnit} onChange={e => handleItemChange(item.id, 'pricePerUnit', e.target.value)} onBlur={() => handleBlur(item.id, 'pricePerUnit')} style={{ textAlign: 'center' }} />
                   </td>
                   <td>
-                    <input 
-                      type="number" 
-                      step="0.1" 
-                      placeholder="₹ 0.0" 
-                      value={item.totalAmount} 
-                      onChange={e => handleItemChange(item.id, 'totalAmount', e.target.value)} 
-                      onBlur={() => handleBlur(item.id, 'totalAmount')} 
+                    <input
+                      type="number"
+                      step="1"
+                      placeholder="0"
+                      value={item.totalAmount}
+                      onChange={e => handleItemChange(item.id, 'totalAmount', e.target.value)}
+                      onBlur={() => handleBlur(item.id, 'totalAmount')}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           e.preventDefault();
                           addRow();
                           setTimeout(() => {
-                            const itemInputs = document.querySelectorAll('input[placeholder="Item Name"]');
+                            const itemInputs = document.querySelectorAll('input[placeholder="Type or select product..."]');
                             if (itemInputs.length > 0) {
                               itemInputs[itemInputs.length - 1].focus();
                             }
                           }, 50);
                         }
                       }}
-                      style={{ textAlign: 'center', fontWeight: 'bold', color: 'var(--secondary)' }} 
+                      style={{ textAlign: 'center', fontWeight: 'bold', color: 'var(--secondary)' }}
                     />
                   </td>
                   <td style={{ textAlign: 'center' }}>
-                    <button type="button" className="btn-icon" onClick={() => removeRow(item.id)} disabled={items.length === 1}>
+                    <button type="button" className="btn-icon" onClick={() => removeRow(item.id)} tabIndex={-1} disabled={items.length === 1}>
                       <Trash2 size={18} />
                     </button>
                   </td>
@@ -645,11 +649,11 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
           <div className="glass-card" style={{ background: 'rgba(255,255,255,0.05)', width: '100%', maxWidth: '300px', padding: '1rem' }}>
             <div className="form-group" style={{ marginBottom: '0.5rem' }}>
               <label style={{ fontSize: '0.8rem' }}>Amount taken with me</label>
-              <input 
-                type="number" 
-                placeholder="₹ 0.0" 
-                value={amountTaken} 
-                onChange={e => setAmountTaken(e.target.value)} 
+              <input
+                type="number"
+                placeholder="₹ 0.0"
+                value={amountTaken}
+                onChange={e => setAmountTaken(e.target.value)}
                 onBlur={() => {
                   const val = parseFloat(amountTaken);
                   if (!isNaN(val)) {
@@ -662,10 +666,10 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
             {amountTaken && (
               <div className="flex-between" style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                 <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Balance Left:</span>
-                <span style={{ 
-                  fontWeight: 'bold', 
-                  fontSize: '1.2rem', 
-                  color: (parseFloat(amountTaken) - parseFloat(calculateGrandTotal())) >= 0 ? 'var(--secondary)' : '#ef4444' 
+                <span style={{
+                  fontWeight: 'bold',
+                  fontSize: '1.2rem',
+                  color: (parseFloat(amountTaken) - parseFloat(calculateGrandTotal())) >= 0 ? 'var(--secondary)' : '#ef4444'
                 }}>
                   ₹{(parseFloat(amountTaken) - parseFloat(calculateGrandTotal())).toFixed(1)}
                 </span>
@@ -674,8 +678,20 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
           </div>
         </div>
 
-        <div style={{ marginTop: '2rem' }}>
-          <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Save Receipt</button>
+        <div style={{ marginTop: '2rem', display: 'flex', gap: '12px' }}>
+          <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
+            {editingReceiptId ? 'Save Receipt Changes' : 'Save Receipt'}
+          </button>
+          {editingReceiptId && (
+            <button 
+              type="button" 
+              className="btn btn-reset-form"
+              style={{ background: 'rgba(255,255,255,0.08)', border: '1.5px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '9999px', padding: '0.6rem 1.4rem' }}
+              onClick={() => onCancelEdit ? onCancelEdit() : resetForm()}
+            >
+              Cancel Edit
+            </button>
+          )}
         </div>
       </form>
     </div>
