@@ -1,6 +1,9 @@
 import { neon } from '@neondatabase/serverless';
 
-const DATABASE_URL = import.meta.env.VITE_NEON_DATABASE_URL;
+const DATABASE_URL = 
+  import.meta.env.VITE_NEON_DATABASE_URL || 
+  import.meta.env.VITE_DATABASE_URL || 
+  import.meta.env.DATABASE_URL;
 
 if (!DATABASE_URL) {
   console.error('Missing VITE_NEON_DATABASE_URL! Please configure it in your environment settings or .env.local file.');
