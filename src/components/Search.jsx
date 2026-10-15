@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Search as SearchIcon, MapPin, ReceiptText, ChevronRight } from 'lucide-react';
 
-export default function Search({ onPurchaseClick, purchases, onEditReceipt, onReceiptClick }) {
+export default function Search({ onPurchaseClick, purchases, onEditReceipt, onReceiptClick, onDeleteReceipt }) {
   const [searchTerm, setSearchTerm] = useState('');
 
   // Group unique items from actual purchases
@@ -134,7 +134,7 @@ export default function Search({ onPurchaseClick, purchases, onEditReceipt, onRe
                       </div>
                       <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{r.items.length} items</div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
+                    <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <div style={{ fontWeight: 'bold' }}>₹{r.total.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</div>
                     </div>
                   </div>

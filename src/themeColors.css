@@ -1,0 +1,40 @@
+/* ==============================================================================
+   🎨 TRACKIT THEME COLOR PALETTE CONFIGURATION
+   ==============================================================================
+   HOW TO USE:
+   1. Change any of the 4 HEX codes below for the LIGHT THEME or DARK THEME.
+   2. Save this file (Ctrl + S).
+   3. The website will instantly update with your new colors!
+
+   💡 TIP: In your editor, you can click on the small colored square next to 
+   each hex code to open a visual color picker.
+   ============================================================================== */
+
+:root {
+  /* ============================================================================
+     ☀️ LIGHT THEME PALETTE (4 HEX Colors)
+     ----------------------------------------------------------------------------
+     Color 1: Main Background (lightest tone)
+     Color 2: Secondary / Gradient Accent (soft tone)
+     Color 3: Borders, Badges, Dividers (medium tone)
+     Color 4: Primary Accent, Highlights & Action Buttons (vibrant tone)
+     ============================================================================ */
+  --light-color-1: #F3F4F6; /* 1. Main Background (Clean Neutral Light Gray/Off-White) */
+  --light-color-2: #FFFFFF; /* 2. Cards & Container Surfaces (Pure White) */
+  --light-color-3: #CBD5E1; /* 3. Borders, Badges & Input Outlines (Crisp Slate Border) */
+  --light-color-4: #3255f1; /* 4. Primary Accent & Action Buttons (Rich Bold Deep Purple) */
+
+  /* ============================================================================
+     🌙 DARK THEME PALETTE (4 HEX Colors)
+     ----------------------------------------------------------------------------
+     Color 1: Deep Main Background (darkest tone)
+     Color 2: Cards & Container Surface (dark tone)
+     Color 3: Primary Accent & Main Action Buttons (vibrant tone)
+     Color 4: Secondary Accent, Badges & Highlight Text (lighter vibrant tone)
+     ============================================================================ */
+  --dark-color-1: #0B0F17;  /* 1. Deep Main Background (Deep Charcoal Slate) */
+  --dark-color-2: #1E293B;  /* 2. Cards & Container Surfaces (Elevated Slate) */
+  --dark-color-3: #0EA5E9;  /* 3. Primary Accent & Buttons (Electric Sky Blue) */
+  --dark-color-4: #7DD3FC;  /* 4. Secondary Accent & Badges (Soft Muted Sky) */
+}
+

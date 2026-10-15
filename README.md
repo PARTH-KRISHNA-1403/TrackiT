@@ -2,7 +2,7 @@
 
 **Your personal grocery price tracker and purchase ledger.**
 
-Track iT is a modern, mobile-friendly web app that helps you log grocery purchases, organize receipts, track item prices over time, and stay on top of your monthly spending — all backed by a real-time Supabase database.
+Track iT is a modern, mobile-friendly web app that helps you log grocery purchases, organize receipts, track item prices over time, and stay on top of your monthly spending — all backed by serverless Neon Postgres.
 
 ---
 
@@ -26,7 +26,7 @@ Track iT is a modern, mobile-friendly web app that helps you log grocery purchas
 
 - **Frontend** — [React 19](https://react.dev/) with JSX
 - **Build Tool** — [Vite 8](https://vitejs.dev/)
-- **Backend / Database** — [Supabase](https://supabase.com/) (PostgreSQL + REST API)
+- **Backend / Database** — [Neon](https://neon.tech/) (Serverless PostgreSQL)
 - **Charts** — [Recharts](https://recharts.org/)
 - **Icons** — [Lucide React](https://lucide.dev/)
 - **PWA** — [vite-plugin-pwa](https://vite-pwa-org.netlify.app/)
@@ -53,8 +53,8 @@ TrackiT/
 │   ├── App.css                # App-level styles
 │   ├── index.css              # Global styles, design tokens, animations
 │   ├── main.jsx               # React DOM entry point
-│   └── supabaseClient.js      # Supabase client initialization
-├── .env.local                 # Supabase URL & anon key (not committed)
+│   └── neonClient.js          # Neon database client initialization
+├── .env.local                 # Neon database connection URL (not committed)
 ├── index.html                 # HTML entry point
 ├── vite.config.js             # Vite + PWA plugin configuration
 ├── package.json
@@ -69,7 +69,7 @@ TrackiT/
 
 - [Node.js](https://nodejs.org/) **v18+**
 - [npm](https://www.npmjs.com/) (comes with Node.js)
-- A [Supabase](https://supabase.com/) project with the required tables (see [Database Schema](#-database-schema) below)
+- A [Neon](https://neon.tech/) project with the required tables (see [Database Schema](#-database-schema) below)
 
 ### 1. Clone the repository
 
@@ -89,11 +89,10 @@ npm install
 Create a `.env.local` file in the project root:
 
 ```env
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key-here
+VITE_NEON_DATABASE_URL=postgresql://neondb_owner:<password>@<endpoint>.neon.tech/neondb?sslmode=require
 ```
 
-> You can find these values in your Supabase project dashboard under **Settings → API**.
+> You can also link automatically using the Neon CLI: `neon link --project-id <your-project-id> --branch <branch-name> -y`
 
 ### 4. Start the development server
 
@@ -113,7 +112,7 @@ npm run build
 
 ## 🗄️ Database Schema
 
-The app expects two tables in your Supabase project:
+The app expects two tables in your Neon Postgres project:
 
 ### `item_list`
 

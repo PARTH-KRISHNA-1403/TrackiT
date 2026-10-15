@@ -2,16 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Search, MapPin, X, Pencil, LineChart as ChartIcon, Calendar, Barcode, ChevronRight, ReceiptText } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { supabase } from '../supabaseClient';
+import { neonClient } from '../neonClient';
 
-export default function Dashboard({ stats, purchases, onPurchaseClick, onEditReceipt, onReceiptClick }) {
+export default function Dashboard({ stats, purchases, onPurchaseClick, onEditReceipt, onReceiptClick, onDeleteReceipt, resetTrigger }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSource, setSelectedSource] = useState(null);
   const [savedItems, setSavedItems] = useState([]);
-  
+
   // State for inline edit item modal
   const [editingItem, setEditingItem] = useState(null);
-  
+
+  useEffect(() => {
+    if (resetTrigger) {
+      setSearchTerm('');
+      setSelectedSource(null);
+      setEditingItem(null);
+      setSelectedHistoryItem(null);
+    }
+  }, [resetTrigger]);
+
   // State for item purchase history & price graph modal
   const [selectedHistoryItem, setSelectedHistoryItem] = useState(null);
   const [historyData, setHistoryData] = useState([]);
@@ -19,7 +28,7 @@ export default function Dashboard({ stats, purchases, onPurchaseClick, onEditRec
 
   // Fetch saved items from item_list database table
   const fetchSavedItems = async () => {
-    const { data } = await supabase
+    const { data } = await neonClient
       .from('item_list')
       .select('*')
       .order('name', { ascending: true });
@@ -37,9 +46,9 @@ export default function Dashboard({ stats, purchases, onPurchaseClick, onEditRec
   useEffect(() => {
     if (selectedHistoryItem) {
       setHistoryLoading(true);
-      const query = selectedHistoryItem.id 
-        ? supabase.from('purchases').select('*').eq('item_id', selectedHistoryItem.id).order('purchase_date', { ascending: true })
-        : supabase.from('purchases').select('*').ilike('item_name', selectedHistoryItem.name).order('purchase_date', { ascending: true });
+      const query = selectedHistoryItem.id
+        ? neonClient.from('purchases').select('*').eq('item_id', selectedHistoryItem.id).order('purchase_date', { ascending: true })
+        : neonClient.from('purchases').select('*').ilike('item_name', selectedHistoryItem.name).order('purchase_date', { ascending: true });
 
       query.then(({ data }) => {
         if (data) {
@@ -214,12 +223,12 @@ export default function Dashboard({ stats, purchases, onPurchaseClick, onEditRec
 
     try {
       if (editingItem.id) {
-        await supabase
+        await neonClient
           .from('item_list')
           .update(updatePayload)
           .eq('id', editingItem.id);
       } else {
-        await supabase
+        await neonClient
           .from('item_list')
           .insert([updatePayload]);
       }
@@ -237,7 +246,7 @@ export default function Dashboard({ stats, purchases, onPurchaseClick, onEditRec
       {/* Universal Search Bar */}
       <div className="universal-search-container" style={{ position: 'relative' }}>
         <Search size={22} className="search-icon" />
-        <input 
+        <input
           type="text"
           placeholder="Universal Search — search source, item name, category, code..."
           value={searchTerm}
@@ -245,10 +254,10 @@ export default function Dashboard({ stats, purchases, onPurchaseClick, onEditRec
           className="universal-search-input"
         />
         {searchTerm && (
-          <button 
-            type="button" 
-            className="btn-icon" 
-            onClick={() => setSearchTerm('')} 
+          <button
+            type="button"
+            className="btn-icon"
+            onClick={() => setSearchTerm('')}
             style={{ position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', background: 'transparent' }}
           >
             <X size={18} color="var(--text-muted)" />
@@ -260,25 +269,25 @@ export default function Dashboard({ stats, purchases, onPurchaseClick, onEditRec
       {!searchTerm.trim() && (
         !selectedSource ? (
           <div className="cards-grid-4 animate-fade-in">
-            <div 
+            <div
               className="source-card card-mandoli"
               onClick={() => handleCardClick('Mandoli')}
             >
               <h2>Mandoli</h2>
             </div>
-            <div 
+            <div
               className="source-card card-canteen"
               onClick={() => handleCardClick('Canteen')}
             >
               <h2>Canteen</h2>
             </div>
-            <div 
+            <div
               className="source-card card-surplus"
               onClick={() => handleCardClick('Surplus')}
             >
               <h2>Surplus</h2>
             </div>
-            <div 
+            <div
               className="source-card card-other"
               onClick={() => handleCardClick('Other')}
             >
@@ -286,7 +295,7 @@ export default function Dashboard({ stats, purchases, onPurchaseClick, onEditRec
             </div>
           </div>
         ) : (
-          <div 
+          <div
             className={`source-card-expanded card-${selectedSource.toLowerCase()}`}
             onClick={() => setSelectedSource(null)}
           >
@@ -298,19 +307,18 @@ export default function Dashboard({ stats, purchases, onPurchaseClick, onEditRec
       {/* Selected Source Invoices Window */}
       {selectedSource && !searchTerm.trim() && (
         <div className="glass-card animate-fade-in" style={{ marginTop: '1.5rem' }}>
-          <div className="flex-between" style={{ marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
+          <div className="flex-between invoice-header-row" style={{ marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', flexWrap: 'wrap', gap: '8px' }}>
             <div>
               <h3 style={{ margin: 0, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <ReceiptText size={20} color="var(--primary)" />
                 <span>Invoices for {selectedSource}</span>
               </h3>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+              <div className="invoice-subtitle" style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                 {sourceReceipts.length} {sourceReceipts.length === 1 ? 'invoice' : 'invoices'} found
               </div>
             </div>
-            <button 
-              className="btn" 
-              style={{ padding: '6px 14px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.08)' }}
+            <button
+              className="btn btn-clear-filter"
               onClick={() => setSelectedSource(null)}
             >
               Clear Filter
@@ -321,80 +329,36 @@ export default function Dashboard({ stats, purchases, onPurchaseClick, onEditRec
             {sourceReceipts.map((r, idx) => (
               <div
                 key={r.receiptId || idx}
-                className="flex-between receipt-item"
-                style={{
-                  padding: '1rem 1.15rem',
-                  borderBottom: '1px solid var(--border-color)',
-                  cursor: 'pointer',
-                  borderRadius: '14px',
-                  marginBottom: '0.6rem',
-                  background: 'rgba(255,255,255,0.03)',
-                  transition: 'all 0.25s ease'
-                }}
+                className="receipt-item invoice-card-row"
                 onClick={() => onReceiptClick && onReceiptClick(r)}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  {/* Eye-catching Date Badge */}
-                  <div style={{
-                    background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(5, 150, 105, 0.15))',
-                    border: '1.5px solid rgba(16, 185, 129, 0.4)',
-                    padding: '0.65rem 1rem',
-                    borderRadius: '14px',
-                    textAlign: 'center',
-                    minWidth: '105px',
-                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)'
-                  }}>
-                    <div style={{ fontSize: '0.65rem', color: 'var(--secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '800' }}>
-                      DATE
-                    </div>
-                    <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#ffffff', marginTop: '2px' }}>
+                <div className="invoice-left-section">
+                  <div className="invoice-date-badge">
+                    <div className="invoice-date-label">DATE</div>
+                    <div className="invoice-date-val">
                       {new Date(r.date).toLocaleDateString('en-GB')}
                     </div>
                   </div>
 
-                  <div>
-                    <div style={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span>{r.receiptId ? `Invoice #${r.receiptId}` : `Receipt #${idx + 1}`}</span>
-                      <span style={{ fontSize: '0.75rem', padding: '2px 8px', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', borderRadius: '10px', fontWeight: 'bold' }}>
-                        {r.items.length} {r.items.length === 1 ? 'item' : 'items'}
-                      </span>
+                  <div className="invoice-details-block">
+                    <div className="invoice-title-line">
+                      <span className="invoice-id-text">{r.receiptId ? `Invoice #${r.receiptId}` : `Receipt #${idx + 1}`}</span>
                     </div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '4px' }}>
+                    <div className="invoice-items-summary">
                       {r.items.map(i => i.item_name).slice(0, 3).join(', ')}
                       {r.items.length > 3 ? ` +${r.items.length - 3} more` : ''}
                     </div>
                   </div>
                 </div>
 
-                {/* Center Section: Eye-catching Source Badge Block (for 'Other' category) */}
-                {selectedSource === 'Other' && (
-                  <div style={{
-                    background: 'linear-gradient(135deg, rgba(234, 88, 12, 0.25), rgba(249, 115, 22, 0.15))',
-                    border: '1.5px solid rgba(249, 115, 22, 0.45)',
-                    color: '#fb923c',
-                    padding: '0.65rem 1.15rem',
-                    borderRadius: '14px',
-                    textAlign: 'center',
-                    fontWeight: '800',
-                    fontSize: '0.9rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    boxShadow: '0 4px 14px rgba(234, 88, 12, 0.2)'
-                  }}>
-                    <MapPin size={16} color="#fb923c" />
-                    <span>{r.source || 'Other'}</span>
-                  </div>
-                )}
-
-                <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '700' }}>Total Amount</div>
-                    <div style={{ fontSize: '1.35rem', fontWeight: '800', color: 'var(--secondary)', textShadow: '0 0 10px rgba(52, 211, 153, 0.3)' }}>
+                <div className="invoice-right-section">
+                  <div className="invoice-total-block">
+                    <div className="invoice-total-label">Total Amount</div>
+                    <div className="invoice-total-val">
                       ₹{r.total.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                     </div>
                   </div>
-                  <ChevronRight size={20} color="var(--text-muted)" />
+                  <ChevronRight size={18} className="invoice-chevron" />
                 </div>
               </div>
             ))}
@@ -422,13 +386,12 @@ export default function Dashboard({ stats, purchases, onPurchaseClick, onEditRec
               <h3 style={{ margin: 0, color: 'var(--text-main)' }}>
                 Search Results for "{searchTerm}"
               </h3>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+              <div className="invoice-subtitle" style={{ fontSize: '0.85rem', marginTop: '4px' }}>
                 {filteredItems.length} {filteredItems.length === 1 ? 'item' : 'items'} found
               </div>
             </div>
-            <button 
-              className="btn" 
-              style={{ padding: '6px 14px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.08)' }}
+            <button
+              className="btn btn-clear-filter"
               onClick={() => setSearchTerm('')}
             >
               Clear Search
@@ -453,7 +416,7 @@ export default function Dashboard({ stats, purchases, onPurchaseClick, onEditRec
                   <div style={{ fontWeight: 'bold', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span>{item.name}</span>
                     {item.sizeValue && item.sizeUnit && (
-                      <span style={{ fontSize: '0.8rem', padding: '2px 8px', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', borderRadius: '12px', fontWeight: 'bold' }}>
+                      <span style={{ fontSize: '0.8rem', padding: '2px 8px', background: 'color-mix(in srgb, var(--primary) 15%, transparent)', color: 'var(--secondary)', borderRadius: '12px', fontWeight: 'bold' }}>
                         {item.sizeValue} {item.sizeUnit}
                       </span>
                     )}
@@ -490,19 +453,11 @@ export default function Dashboard({ stats, purchases, onPurchaseClick, onEditRec
                   {/* Pencil Edit Icon Button */}
                   <button
                     type="button"
-                    className="btn-icon"
+                    className="btn-action-edit"
                     onClick={(e) => handleOpenEditModal(e, item)}
                     title="Edit Item Details (Units, Barcode ID, etc.)"
-                    style={{
-                      background: 'rgba(255,255,255,0.08)',
-                      padding: '8px',
-                      borderRadius: '50%',
-                      color: 'var(--text-main)',
-                      border: '1px solid var(--border-color)',
-                      transition: 'all 0.2s ease'
-                    }}
                   >
-                    <Pencil size={16} />
+                    <Pencil size={15} />
                   </button>
                 </div>
               </div>
@@ -540,7 +495,7 @@ export default function Dashboard({ stats, purchases, onPurchaseClick, onEditRec
             <form onSubmit={handleSaveEditedItem}>
               <div className="form-group" style={{ marginBottom: '1rem' }}>
                 <label style={{ fontSize: '0.85rem' }}>Item Name *</label>
-                <input 
+                <input
                   type="text"
                   required
                   value={editingItem.name}
@@ -550,7 +505,7 @@ export default function Dashboard({ stats, purchases, onPurchaseClick, onEditRec
 
               <div className="form-group" style={{ marginBottom: '1rem' }}>
                 <label style={{ fontSize: '0.85rem' }}>Category</label>
-                <input 
+                <input
                   type="text"
                   value={editingItem.category}
                   onChange={e => setEditingItem({ ...editingItem, category: e.target.value })}
@@ -561,7 +516,7 @@ export default function Dashboard({ stats, purchases, onPurchaseClick, onEditRec
               <div className="form-group" style={{ marginBottom: '1rem' }}>
                 <label style={{ fontSize: '0.85rem' }}>Size & Unit</label>
                 <div className="size-unit-merged-field">
-                  <input 
+                  <input
                     type="number"
                     step="1"
                     placeholder="Size"
@@ -570,7 +525,7 @@ export default function Dashboard({ stats, purchases, onPurchaseClick, onEditRec
                     className="size-input-part"
                   />
                   <div className="size-unit-divider"></div>
-                  <select 
+                  <select
                     value={editingItem.sizeUnit}
                     onChange={e => setEditingItem({ ...editingItem, sizeUnit: e.target.value })}
                     className="unit-select-part"
@@ -587,7 +542,7 @@ export default function Dashboard({ stats, purchases, onPurchaseClick, onEditRec
 
               <div className="form-group" style={{ marginBottom: '1.5rem' }}>
                 <label style={{ fontSize: '0.85rem' }}>Barcode ID / QR ID (Optional)</label>
-                <input 
+                <input
                   type="text"
                   placeholder="e.g. 8901234567890"
                   value={editingItem.qrId}
@@ -648,10 +603,10 @@ export default function Dashboard({ stats, purchases, onPurchaseClick, onEditRec
                           <YAxis stroke="#94a3b8" />
                           <Tooltip
                             contentStyle={{ backgroundColor: 'var(--bg-color)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-main)' }}
-                            itemStyle={{ color: '#34d399' }}
+                            itemStyle={{ color: 'var(--primary)' }}
                             formatter={(value, name, props) => [`₹${parseFloat(value || 0).toFixed(1)}`, `Source: ${props.payload.source || 'General'}`]}
                           />
-                          <Line type="monotone" dataKey="price" stroke="#34d399" strokeWidth={3} activeDot={{ r: 8 }} />
+                          <Line type="monotone" dataKey="price" stroke="var(--primary)" strokeWidth={3} activeDot={{ r: 8 }} />
                         </LineChart>
                       </ResponsiveContainer>
                     ) : (
@@ -679,11 +634,11 @@ export default function Dashboard({ stats, purchases, onPurchaseClick, onEditRec
                             {h.quantity} {selectedHistoryItem.sizeUnit || 'unit'}
                           </span>
                           <span style={{ fontWeight: 'bold', color: 'var(--text-main)' }}>
-                            ₹{parseFloat(h.totalAmount || 0).toFixed(1)}
+                            {parseFloat(h.totalAmount || 0) > 0 ? `₹${parseFloat(h.totalAmount).toFixed(1)}` : '—'}
                           </span>
                         </div>
                         <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '2px' }}>
-                          ₹{parseFloat(h.price || 0).toFixed(1)} / {selectedHistoryItem.sizeUnit || 'unit'}
+                          {parseFloat(h.price || 0) > 0 ? `₹${parseFloat(h.price).toFixed(1)} / ${selectedHistoryItem.sizeUnit || 'unit'}` : '—'}
                         </div>
                       </div>
                     </div>

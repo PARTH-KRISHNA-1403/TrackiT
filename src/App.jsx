@@ -5,8 +5,8 @@ import AddPurchase from './components/AddPurchase';
 import ItemHistory from './components/ItemHistory';
 import ManageItems from './components/ManageItems';
 import Search from './components/Search';
-import { supabase } from './supabaseClient';
-import { Sun, Moon, LayoutGrid, PlusCircle, Package, ReceiptText, MapPin, Edit2, X, Calendar } from 'lucide-react';
+import { neonClient } from './neonClient';
+import { Sun, Moon, LayoutGrid, PlusCircle, Package, ReceiptText, MapPin, Edit2, X, Calendar, Trash2 } from 'lucide-react';
 
 function App() {
   const [purchases, setPurchases] = useState([]);
@@ -34,7 +34,7 @@ function App() {
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
-  const [draftPurchase, setDraftPurchase] = useState({
+  const createInitialDraft = () => ({
     source: '',
     purchaseDate: new Date().toISOString().split('T')[0],
     amountTaken: '',
@@ -45,10 +45,12 @@ function App() {
     ]
   });
 
+  const [draftPurchase, setDraftPurchase] = useState(createInitialDraft);
+
 
   const fetchData = async () => {
     try {
-      const { data: purchasesData, error } = await supabase
+      const { data: purchasesData, error } = await neonClient
         .from('purchases')
         .select(`
           *,
@@ -139,12 +141,14 @@ function App() {
       quantity: item.quantity !== undefined && item.quantity !== null 
         ? (item.quantity % 1 === 0 ? Math.round(item.quantity) : item.quantity) 
         : '',
-      pricePerUnit: item.price_per_unit !== undefined && item.price_per_unit !== null 
-        ? parseFloat(item.price_per_unit).toFixed(1) 
-        : (item.unit_price !== undefined && item.unit_price !== null ? parseFloat(item.unit_price).toFixed(1) : (item.pricePerUnit || '')),
-      totalAmount: item.total_amount !== undefined && item.total_amount !== null 
-        ? parseFloat(item.total_amount).toFixed(1) 
-        : (item.totalAmount || ''),
+      pricePerUnit: (item.price_per_unit !== undefined && item.price_per_unit !== null && parseFloat(item.price_per_unit) > 0)
+        ? parseFloat(item.price_per_unit).toFixed(1)
+        : ((item.unit_price !== undefined && item.unit_price !== null && parseFloat(item.unit_price) > 0)
+          ? parseFloat(item.unit_price).toFixed(1)
+          : ((parseFloat(item.pricePerUnit) > 0) ? String(item.pricePerUnit) : '')),
+      totalAmount: (item.total_amount !== undefined && item.total_amount !== null && parseFloat(item.total_amount) > 0)
+        ? parseFloat(item.total_amount).toFixed(1)
+        : ((parseFloat(item.totalAmount) > 0) ? String(item.totalAmount) : ''),
       hasDescription: !!item.description,
       description: item.description || ''
     }));
@@ -164,10 +168,70 @@ function App() {
 
   const handleCancelEdit = () => {
     setEditingReceiptId(null);
+    setDraftPurchase(createInitialDraft());
     if (editingReceiptBackup) {
       setSelectedReceipt(editingReceiptBackup);
     }
     setActiveTab('dashboard');
+  };
+
+  const [dashboardResetTrigger, setDashboardResetTrigger] = useState(0);
+  const [manageItemsResetTrigger, setManageItemsResetTrigger] = useState(0);
+
+  const handleDashboardTabClick = () => {
+    setDashboardResetTrigger(prev => prev + 1);
+    setActiveTab('dashboard');
+  };
+
+  const handleManageItemsTabClick = () => {
+    setManageItemsResetTrigger(prev => prev + 1);
+    setActiveTab('items');
+  };
+
+  const handleAddPurchaseTabClick = () => {
+    if (editingReceiptId) {
+      setEditingReceiptId(null);
+      setEditingReceiptBackup(null);
+      setDraftPurchase(createInitialDraft());
+    }
+    setActiveTab('add');
+  };
+
+  const handleDeleteReceipt = async (receipt) => {
+    if (!receipt) return;
+    const invoiceLabel = receipt.receiptId ? `Invoice #${receipt.receiptId}` : 'this invoice';
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete ${invoiceLabel}?\n\nThis will remove the purchase transactions from the database, while keeping your saved items intact in the database.`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      const purchaseIds = (receipt.items || []).map(i => i.id).filter(Boolean);
+
+      if (purchaseIds.length > 0) {
+        const { error: delError } = await neonClient
+          .from('purchases')
+          .delete()
+          .in('id', purchaseIds);
+        if (delError) throw delError;
+      }
+
+      if (receipt.receiptId) {
+        await neonClient
+          .from('purchases')
+          .delete()
+          .or(`invoice_number.eq.${receipt.receiptId},receipt_id.eq.${receipt.receiptId}`);
+      }
+
+      setSelectedReceipt(null);
+      setTappedQtyIndex(null);
+      setTappedDescIndex(null);
+
+      await fetchData();
+    } catch (err) {
+      console.error('Failed to delete invoice:', err);
+      alert('Failed to delete invoice: ' + (err.message || 'Unknown error'));
+    }
   };
 
   const handlePurchaseAdded = () => {
@@ -218,32 +282,36 @@ function App() {
   return (
     <div className="app-container">
       <header className="app-header">
-        <div className="header-brand">
+        <div 
+          className="header-brand" 
+          onClick={handleDashboardTabClick}
+          style={{ cursor: 'pointer' }}
+          title="Return to Main Dashboard"
+        >
           <div className="brand-logo-icon">
             <ReceiptText size={22} color="#fff" />
           </div>
           <span className="brand-title">Track-iT</span>
-          <span className="brand-badge">LEDGER</span>
         </div>
 
         <nav className="header-nav-tabs">
           <button
             className={`header-tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
-            onClick={() => setActiveTab('dashboard')}
+            onClick={handleDashboardTabClick}
           >
             <LayoutGrid size={18} />
             <span>Dashboard</span>
           </button>
           <button
             className={`header-tab-btn ${activeTab === 'add' ? 'active' : ''}`}
-            onClick={() => setActiveTab('add')}
+            onClick={handleAddPurchaseTabClick}
           >
             <PlusCircle size={18} />
             <span>Add Purchase</span>
           </button>
           <button
             className={`header-tab-btn ${activeTab === 'items' ? 'active' : ''}`}
-            onClick={() => setActiveTab('items')}
+            onClick={handleManageItemsTabClick}
           >
             <Package size={18} />
             <span>Manage Items</span>
@@ -268,12 +336,15 @@ function App() {
               onPurchaseClick={handleItemClick}
               onEditReceipt={handleEditReceipt}
               onReceiptClick={setSelectedReceipt}
+              onDeleteReceipt={handleDeleteReceipt}
+              resetTrigger={dashboardResetTrigger}
             />
           </div>
         )}
 
         {activeTab === 'add' && (
           <AddPurchase
+            key={editingReceiptId ? `edit-${editingReceiptId}` : 'new-purchase'}
             onAdded={handlePurchaseAdded}
             draft={draftPurchase}
             setDraft={setDraftPurchase}
@@ -283,13 +354,14 @@ function App() {
           />
         )}
 
-        {activeTab === 'items' && <ManageItems />}
+        {activeTab === 'items' && <ManageItems resetTrigger={manageItemsResetTrigger} />}
         {activeTab === 'search' && (
           <Search
             onPurchaseClick={handleItemClick}
             purchases={purchases}
             onEditReceipt={handleEditReceipt}
             onReceiptClick={setSelectedReceipt}
+            onDeleteReceipt={handleDeleteReceipt}
           />
         )}
 
@@ -339,15 +411,22 @@ function App() {
                   {selectedReceipt.receiptId ? `Invoice #${selectedReceipt.receiptId}` : 'Receipt Details'}
                 </h3>
               </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <button
                   type="button"
-                  className="btn btn-primary"
-                  style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                  className="btn invoice-modal-edit-btn"
                   onClick={() => handleEditReceipt(selectedReceipt)}
                   title="Edit Receipt"
                 >
                   <Edit2 size={16} /> Edit
+                </button>
+                <button
+                  type="button"
+                  className="btn invoice-modal-delete-btn"
+                  onClick={() => handleDeleteReceipt(selectedReceipt)}
+                  title="Delete Invoice"
+                >
+                  <Trash2 size={16} /> Delete
                 </button>
                 <button
                   type="button"
@@ -361,62 +440,33 @@ function App() {
 
             {/* Invoice Meta Badges (Date & Source) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-              <div style={{
-                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(5, 150, 105, 0.15))',
-                border: '1px solid rgba(16, 185, 129, 0.4)',
-                padding: '0.45rem 0.9rem',
-                borderRadius: '12px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '0.85rem',
-                fontWeight: '700',
-                color: '#ffffff'
-              }}>
-                <Calendar size={14} color="var(--secondary)" />
+              <div className="modal-date-badge">
+                <Calendar size={15} />
                 <span>{new Date(selectedReceipt.date).toLocaleDateString('en-GB')}</span>
               </div>
 
-              <div style={{
-                background: 'linear-gradient(135deg, rgba(234, 88, 12, 0.2), rgba(249, 115, 22, 0.1))',
-                border: '1px solid rgba(249, 115, 22, 0.35)',
-                padding: '0.45rem 0.9rem',
-                borderRadius: '12px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '0.85rem',
-                fontWeight: '700',
-                color: '#fb923c'
-              }}>
-                <MapPin size={14} color="#fb923c" />
+              <div className="modal-source-badge">
+                <MapPin size={15} />
                 <span>Source: {selectedReceipt.source || 'General'}</span>
               </div>
 
-              <div style={{
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid var(--border-color)',
-                padding: '0.45rem 0.9rem',
-                borderRadius: '12px',
-                fontSize: '0.85rem',
-                color: 'var(--text-muted)'
-              }}>
-                Total Items: <strong style={{ color: 'var(--text-main)' }}>{selectedReceipt.items.length}</strong>
+              <div className="modal-items-count-box">
+                Total Items: <strong>{selectedReceipt.items.length}</strong>
               </div>
             </div>
 
             {/* Neat Glassmorphic Invoice Items Table */}
             <div style={{ overflowX: 'auto', marginBottom: '1.5rem', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+              <table className="modal-receipt-table">
                 <thead>
-                  <tr style={{ background: 'rgba(255,255,255,0.04)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
-                    <th style={{ padding: '0.75rem 1rem' }}>#</th>
-                    <th style={{ padding: '0.75rem 1rem' }}>Item Name</th>
-                    <th style={{ padding: '0.75rem 1rem' }}>Category</th>
-                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Qty</th>
-                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Unit</th>
-                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Price (₹)</th>
-                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Total (₹)</th>
+                  <tr>
+                    <th>#</th>
+                    <th>Item Name</th>
+                    <th>Category</th>
+                    <th style={{ textAlign: 'center' }}>Qty</th>
+                    <th style={{ textAlign: 'center' }}>Unit</th>
+                    <th style={{ textAlign: 'right' }}>Price (₹)</th>
+                    <th style={{ textAlign: 'right' }}>Total (₹)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -441,28 +491,32 @@ function App() {
                     }
 
                     return (
-                      <tr key={i} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s ease' }}>
-                        <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>{i + 1}</td>
-                        <td style={{ padding: '0.75rem 1rem', fontWeight: 'bold', color: 'var(--text-main)' }}>
-                          <div>{item.item_name}</div>
+                      <tr key={i}>
+                        <td className="col-idx">{i + 1}</td>
+                        <td className="col-name">
+                          <div className="item-name-text">{item.item_name}</div>
                           {item.description && (
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px', fontStyle: 'italic' }}>
+                            <div className="item-desc-text">
                               {item.description}
                             </div>
                           )}
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>{item.category || 'General'}</td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 'bold', color: 'var(--secondary)' }}>
+                        <td className="col-category">{item.category || 'General'}</td>
+                        <td className="col-qty">
                           {formattedQty}
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                        <td className="col-unit">
                           {unitText}
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--text-muted)' }}>
-                          ₹{parseFloat(item.price_per_unit || item.unit_price || 0).toFixed(1)}
+                        <td className="col-price">
+                          {parseFloat(item.price_per_unit || item.unit_price || 0) > 0
+                            ? `₹${parseFloat(item.price_per_unit || item.unit_price || 0).toFixed(1)}`
+                            : ''}
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 'bold', color: 'var(--text-main)' }}>
-                          ₹{parseFloat(item.total_amount || 0).toFixed(1)}
+                        <td className="col-total">
+                          {parseFloat(item.total_amount || 0) > 0
+                            ? `₹${parseFloat(item.total_amount || 0).toFixed(1)}`
+                            : ''}
                         </td>
                       </tr>
                     );
@@ -472,9 +526,9 @@ function App() {
             </div>
 
             {/* Total Amount Footer */}
-            <div className="flex-between" style={{ padding: '1rem 1.25rem', background: 'rgba(16, 185, 129, 0.1)', border: '1.5px solid rgba(16, 185, 129, 0.35)', borderRadius: '16px' }}>
+            <div className="flex-between modal-total-footer">
               <span style={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'var(--text-main)' }}>Grand Total</span>
-              <span style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--secondary)', textShadow: '0 0 12px rgba(52, 211, 153, 0.35)' }}>
+              <span className="modal-grand-total-val">
                 ₹{selectedReceipt.total.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
               </span>
             </div>

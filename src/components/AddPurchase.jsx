@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PlusCircle, Trash2, RotateCcw } from 'lucide-react';
-import { supabase } from '../supabaseClient';
+import { neonClient } from '../neonClient';
 
 export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId, setEditingReceiptId, onCancelEdit }) {
   const { source, purchaseDate, amountTaken, items } = draft;
@@ -34,7 +34,7 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
 
   useEffect(() => {
     const fetchItemsAndCategories = async () => {
-      const { data: items } = await supabase
+      const { data: items } = await neonClient
         .from('item_list')
         .select('*');
 
@@ -86,19 +86,23 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
         if (field === 'quantity') {
           const qty = parseFloat(value) || 0;
           const price = parseFloat(updatedItem.pricePerUnit) || 0;
-          if (qty && price) {
+          if (qty > 0 && price > 0) {
             updatedItem.totalAmount = (qty * price).toFixed(1);
           }
         } else if (field === 'pricePerUnit') {
           const qty = parseFloat(updatedItem.quantity) || 0;
           const price = parseFloat(value) || 0;
-          if (qty && price) {
+          if (value === '' || price === 0) {
+            updatedItem.totalAmount = '';
+          } else if (qty > 0 && price > 0) {
             updatedItem.totalAmount = (qty * price).toFixed(1);
           }
         } else if (field === 'totalAmount') {
           const qty = parseFloat(updatedItem.quantity) || 0;
           const total = parseFloat(value) || 0;
-          if (qty && total) {
+          if (value === '' || total === 0) {
+            updatedItem.pricePerUnit = '';
+          } else if (qty > 0 && total > 0) {
             updatedItem.pricePerUnit = (total / qty).toFixed(1);
           }
         }
@@ -112,8 +116,14 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
   const handleBlur = (id, field) => {
     setItems(items.map(item => {
       if (item.id === id) {
+        if (item[field] === '' || item[field] === undefined || item[field] === null) {
+          return item;
+        }
         const val = parseFloat(item[field]);
         if (!isNaN(val)) {
+          if (val === 0 && (field === 'pricePerUnit' || field === 'totalAmount')) {
+            return { ...item, [field]: '' };
+          }
           const formattedVal = Number.isInteger(val) ? String(val) : String(parseFloat(val.toFixed(1)));
           return { ...item, [field]: formattedVal };
         }
@@ -152,6 +162,8 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
     }
   };
 
+  const qtyInputRefs = React.useRef({});
+
   const handleSelectSuggestion = (id, item) => {
     setItems(items.map(it => {
       if (it.id === id) {
@@ -167,6 +179,13 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
     }));
     setActiveRowId(null);
     setFilteredSuggestions([]);
+
+    setTimeout(() => {
+      if (qtyInputRefs.current[id]) {
+        qtyInputRefs.current[id].focus();
+        qtyInputRefs.current[id].select?.();
+      }
+    }, 50);
   };
 
   const handleKeyDown = (e, id) => {
@@ -258,7 +277,7 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
         return;
       }
 
-      // Check if any valid item has missing category, quantity, rate, or amount
+      // Check if any valid item has missing category or quantity
       for (const item of validItems) {
         if (!item.category || !item.category.trim()) {
           alert(`Please enter a category for "${item.itemName}".`);
@@ -268,10 +287,6 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
           alert(`Please enter a quantity for "${item.itemName}".`);
           return;
         }
-        if (!item.pricePerUnit && !item.totalAmount) {
-          alert(`Please enter a rate or amount for "${item.itemName}".`);
-          return;
-        }
       }
 
       const itemInserts = validItems.map(async (item) => {
@@ -279,7 +294,7 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
         const querySizeVal = item.sizeValue ? parseFloat(item.sizeValue) : null;
         const querySizeUnit = item.sizeUnit || null;
 
-        let query = supabase
+        let query = neonClient
           .from('item_list')
           .select('id')
           .eq('name', cleanName);
@@ -302,7 +317,7 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
         if (existingItems && existingItems.length > 0) {
           itemId = existingItems[0].id;
         } else {
-          const { data: newItem, error: insertError } = await supabase
+          const { data: newItem, error: insertError } = await neonClient
             .from('item_list')
             .insert([{
               name: cleanName,
@@ -317,7 +332,7 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
           if (newItem && newItem.length > 0) {
             itemId = newItem[0].id;
           } else {
-            let fallbackQuery = supabase
+            let fallbackQuery = neonClient
               .from('item_list')
               .select('id')
               .eq('name', cleanName);
@@ -362,14 +377,14 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
       }
 
       if (editingReceiptId) {
-        const { error: deleteError } = await supabase
+        const { error: deleteError } = await neonClient
           .from('purchases')
           .delete()
           .or(`invoice_number.eq.${editingReceiptId},receipt_id.eq.${editingReceiptId}`);
         if (deleteError) throw deleteError;
       }
 
-      const { error } = await supabase
+      const { error } = await neonClient
         .from('purchases')
         .insert(purchasesToInsert);
       if (error) throw error;
@@ -394,22 +409,19 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
 
   return (
     <div className="glass-card animate-fade-in">
-      <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
-        <h2><PlusCircle size={24} style={{ verticalAlign: 'middle', marginRight: '8px' }} /> {editingReceiptId ? `Edit Receipt #${editingReceiptId}` : 'Add New Receipt'}</h2>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          {editingReceiptId && (
-            <button type="button" className="btn" onClick={() => { if (setEditingReceiptId) setEditingReceiptId(null); resetForm(); }} style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-main)', border: '1px solid var(--border-color)', fontSize: '0.8rem', padding: '4px 12px' }}>
-              Cancel Edit
-            </button>
-          )}
-          <button type="button" className="btn-reset-form" onClick={resetForm}>
-            <RotateCcw size={16} />
-            <span>Reset Form</span>
+      <div className="flex-between add-receipt-header" style={{ marginBottom: '1.25rem', alignItems: 'center' }}>
+        <h2 style={{ display: 'flex', alignItems: 'center', margin: 0, fontSize: 'clamp(1.15rem, 4vw, 1.45rem)' }}>
+          <PlusCircle size={22} style={{ verticalAlign: 'middle', marginRight: '8px', flexShrink: 0 }} /> 
+          <span>{editingReceiptId ? `Edit Receipt #${editingReceiptId}` : 'Add New Receipt'}</span>
+        </h2>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginLeft: 'auto' }}>
+          <button type="button" className="btn-reset-form" onClick={resetForm} title="Reset Form" aria-label="Reset Form">
+            <RotateCcw size={18} />
           </button>
         </div>
       </div>
       <form onSubmit={handleSubmit}>
-        <div className="grid-2" style={{ marginBottom: '1.5rem' }}>
+        <div className="grid-2 add-receipt-main-fields" style={{ marginBottom: '1.25rem' }}>
           <div className="form-group" style={{ position: 'relative' }}>
             <label>Source</label>
             <input
@@ -587,6 +599,7 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
                   </td>
                   <td>
                     <input
+                      ref={el => qtyInputRefs.current[item.id] = el}
                       type="number"
                       step="1"
                       placeholder="0"
@@ -619,12 +632,13 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
                           }, 50);
                         }
                       }}
-                      style={{ textAlign: 'center', fontWeight: 'bold', color: 'var(--secondary)' }}
+                      className="row-amount-input"
+                      style={{ textAlign: 'center', fontWeight: 'bold' }}
                     />
                   </td>
                   <td style={{ textAlign: 'center' }}>
-                    <button type="button" className="btn-icon" onClick={() => removeRow(item.id)} tabIndex={-1} disabled={items.length === 1}>
-                      <Trash2 size={18} />
+                    <button type="button" className="btn-action-delete" onClick={() => removeRow(item.id)} tabIndex={-1} disabled={items.length === 1} title="Delete row">
+                      <Trash2 size={16} />
                     </button>
                   </td>
                 </tr>
@@ -633,20 +647,20 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
           </table>
         </div>
 
-        <div className="receipt-summary-row" style={{ flexDirection: 'column', alignItems: 'flex-end', gap: '1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+        <div className="receipt-summary-row" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <button type="button" className="btn" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-main)', border: '1px solid var(--border-color)' }} onClick={addRow}>
               + Add Row ( ` )
             </button>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ color: 'var(--text-muted)', fontSize: '1rem', marginBottom: '4px' }}>Total Amount:</div>
-              <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--secondary)' }}>
+            <div style={{ textAlign: 'right', marginLeft: 'auto' }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '2px', fontWeight: 600 }}>Total Amount:</div>
+              <div className="purchase-total-amount" style={{ fontSize: 'clamp(1.75rem, 5vw, 2.5rem)', fontWeight: '800' }}>
                 ₹{calculateGrandTotal()}
               </div>
             </div>
           </div>
 
-          <div className="glass-card" style={{ background: 'rgba(255,255,255,0.05)', width: '100%', maxWidth: '300px', padding: '1rem' }}>
+          <div className="glass-card" style={{ background: 'rgba(255,255,255,0.05)', width: '100%', maxWidth: '320px', padding: '1rem', boxSizing: 'border-box' }}>
             <div className="form-group" style={{ marginBottom: '0.5rem' }}>
               <label style={{ fontSize: '0.8rem' }}>Amount taken with me</label>
               <input
@@ -660,16 +674,16 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
                     setAmountTaken(val.toFixed(1));
                   }
                 }}
-                style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)' }}
+                style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)' }}
               />
             </div>
             {amountTaken && (
-              <div className="flex-between" style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+              <div className="flex-between" style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)' }}>
                 <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Balance Left:</span>
-                <span style={{
+                <span className="purchase-balance-amount" style={{
                   fontWeight: 'bold',
                   fontSize: '1.2rem',
-                  color: (parseFloat(amountTaken) - parseFloat(calculateGrandTotal())) >= 0 ? 'var(--secondary)' : '#ef4444'
+                  color: (parseFloat(amountTaken) - parseFloat(calculateGrandTotal())) < 0 ? '#ef4444' : undefined
                 }}>
                   ₹{(parseFloat(amountTaken) - parseFloat(calculateGrandTotal())).toFixed(1)}
                 </span>
@@ -685,8 +699,8 @@ export default function AddPurchase({ onAdded, draft, setDraft, editingReceiptId
           {editingReceiptId && (
             <button 
               type="button" 
-              className="btn btn-reset-form"
-              style={{ background: 'rgba(255,255,255,0.08)', border: '1.5px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '9999px', padding: '0.6rem 1.4rem' }}
+              className="btn btn-secondary-outline"
+              style={{ borderRadius: '9999px', padding: '0.6rem 1.4rem' }}
               onClick={() => onCancelEdit ? onCancelEdit() : resetForm()}
             >
               Cancel Edit

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { LineChart as ChartIcon, Calendar, MapPin } from 'lucide-react';
-import { supabase } from '../supabaseClient';
+import { neonClient } from '../neonClient';
 
 export default function ItemHistory({ item, onReceiptClick }) {
   const [history, setHistory] = useState([]);
@@ -9,7 +9,7 @@ export default function ItemHistory({ item, onReceiptClick }) {
 
   useEffect(() => {
     if (item) {
-      supabase
+      neonClient
         .from('purchases')
         .select('*')
         .eq('item_id', item.item_id)
@@ -54,10 +54,10 @@ export default function ItemHistory({ item, onReceiptClick }) {
                   <YAxis stroke="#94a3b8" />
                   <Tooltip
                     contentStyle={{ backgroundColor: 'var(--bg-color)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-main)' }}
-                    itemStyle={{ color: '#34d399' }}
+                    itemStyle={{ color: 'var(--primary)' }}
                     formatter={(value, name, props) => [`₹${parseFloat(value || 0).toFixed(1)}`, `Source: ${props.payload.source || 'General'}`]}
                   />
-                  <Line type="monotone" dataKey="price" stroke="#34d399" strokeWidth={3} activeDot={{ r: 8 }} />
+                  <Line type="monotone" dataKey="price" stroke="var(--primary)" strokeWidth={3} activeDot={{ r: 8 }} />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
